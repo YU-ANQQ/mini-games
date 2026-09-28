@@ -93,6 +93,7 @@
         <li><b>X＝跳</b>。高球會在地上標出紅色「<b>扣殺點</b>」：站進去，頭上出現「跳！」就跳，空中按一下打＝<b>扣殺</b>（球一進範圍自動打）。</li>
         <li><b>發球</b>：每分左右區輪流（亮起的格子就是要發的地方）。按一次拋球、最高點再按＝完美發球；擊球時按住 <b>↑ 上旋</b>（彈高前竄）、<b>↓ 切球</b>（貼地滑）。</li>
         <li>邊跑邊打，球會往跑的方向拐（側旋）；高吊自帶上旋、小球自帶切。</li>
+        <li><b>體力條</b>（比分下方綠條）：跑動、跳、飛撲、<b>蓄力</b>都會耗體力，站著會回；體力越少跑越慢。每隻角色還有專屬<b>特技</b>。</li>
         <li>擊球會集氣（完美擊球、蓄滿 MAX 集得更快），集滿後<b>下一球自動打出</b>角色專屬必殺。</li>
       </ul>
       <p id="ov-text"></p>
@@ -131,10 +132,11 @@
   const W = 960, H = 600;
   const L = 23.77, NET_Y = L / 2, NET_H = 0.95, HALF_W = 4.115, DOUBLES_HALF = 5.485, SERVICE = 6.4;
   const G = 12, REACH_Z = 2.5, PERFECT_D = 0.6;   // horizontal reach lives in CHARS
-  // public build (GitHub Pages): publish.py flips this to true and renames the electric mouse; the drawing changes with it
-  const PUBLIC_BUILD = true;
   const CHAR = 0.7;                      // character draw scale: small players on a big court (hit reach is in world metres, unaffected)
   const SMASH_REACH = 1.4;               // airborne horizontal reach multiplier (overhead swing reaches further)
+  // stamina (b.st 0..1): moving drains, standing recovers, charging drains extra (the price of holding a charge);
+  // speed x (ST_MIN + ST_SPAN * st): fresh legs run 10% faster than base, empty legs 35% slower
+  const ST_MIN = 0.65, ST_SPAN = 0.45, ST_RUN = 0.09, ST_CHARGE = 0.22, ST_REST = 0.22, ST_JUMP = 0.1, ST_DIVE = 0.12, ST_POINT = 0.2;
   const TOSS_V = 6, APEX_OK = 0.08;     // serve toss speed; perfect-serve window (s) around the toss apex
   const K = 78, Y0 = -3.2, YSPAN = L + 6.4, SCR_NEAR = 592, SCR_FAR = 152, FAR_SHRINK = 0.45;
   const LEVELS = {
@@ -143,23 +145,30 @@
     hard:   { speed: 6.2, miss: 0.03, err: 0.35, meter: 0.16 },
   };
   const POINT_NAMES = ["0", "15", "30", "40"], GAMES_TO_WIN = 3;
-  // playable characters: speed (m/s), jump (take-off m/s), reach / dive (m), power (shot speed x), meter (charge gain x),
+  // playable characters: trait (signature move, see TRAITS below), stDrain (stamina use x), speed (m/s), jump (take-off m/s), reach / dive (m), power (shot speed x), meter (charge gain x),
   // sp = special shot: name, speed, rgb (trail/glow), fx (flight twist in stepBall), hurt (receiver's line); draw = body painter
   const CHARS = {
     roo:     { name: "袋鼠", speed: 6.4, jump: 5.4, reach: 1.5, dive: 3.0, power: 1.0,  meter: 1.0, band: "#f6c453", tag: "平衡型",
-               sp: { name: "迴力鏢火球！", speed: 30, rgb: "255,150,50", fx: "curve", hurt: "好燙！" }, draw: (c) => bodyRoo(c) },
+               sp: { name: "迴力鏢火球！", speed: 30, rgb: "255,150,50", fx: "curve", hurt: "好燙！" }, trait: "dj", tdesc: "二段跳：空中再按一次跳", stDrain: 1.0,
+               draw: (c) => bodyRoo(c) },
     rabbit:  { name: "兔子", speed: 6.8, jump: 6.4, reach: 1.3, dive: 3.0, power: 0.92, meter: 1.0, band: "#ff8fb8", tag: "跳最高、手短",
-               sp: { name: "月亮跳跳球！", speed: 24, rgb: "255,150,200", fx: "hop", hurt: "彈去哪了！" }, draw: (c) => bodyRabbit(c) },
+               sp: { name: "月亮跳跳球！", speed: 24, rgb: "255,150,200", fx: "hop", hurt: "彈去哪了！" }, trait: "hi", tdesc: "跳最高，扣殺王", stDrain: 1.0,
+               draw: (c) => bodyRabbit(c) },
     penguin: { name: "企鵝", speed: 5.5, jump: 4.2, reach: 1.7, dive: 3.8, power: 1.15, meter: 1.0, band: "#7fe0ff", tag: "慢但手長力大、飛撲遠",
-               sp: { name: "冰山滑球！", speed: 26, rgb: "170,230,255", fx: "wobble", hurt: "好滑！" }, draw: (c) => bodyPenguin(c) },
+               sp: { name: "冰山滑球！", speed: 26, rgb: "170,230,255", fx: "wobble", hurt: "好滑！" }, trait: "slide", tdesc: "肚子滑行：飛撲滑很遠、馬上爬起來", stDrain: 1.0,
+               draw: (c) => bodyPenguin(c) },
     cheetah: { name: "獵豹", speed: 8.2, jump: 4.8, reach: 1.4, dive: 3.2, power: 0.95, meter: 1.0, band: "#ff6a2a", tag: "最快、跳得低",
-               sp: { name: "音速球！", speed: 42, rgb: "255,220,110", fx: "none", hurt: "看不見！" }, draw: (c) => bodyCheetah(c) },
+               sp: { name: "音速球！", speed: 42, rgb: "255,220,110", fx: "none", hurt: "看不見！" }, trait: "burst", tdesc: "爆衝：體力七成以上更快，但很快喘", stDrain: 1.6,
+               draw: (c) => bodyCheetah(c) },
     seal:    { name: "海豹", speed: 6.0, jump: 4.4, reach: 1.5, dive: 3.0, power: 1.0,  meter: 1.0, band: "#7fe0ff", tag: "肚子滑行、冰旋球會凍住對手",
-               sp: { name: "冰旋球！", speed: 17, rgb: "150,230,255", fx: "wobble", hurt: "凍、凍住了", freeze: true }, draw: (c, b) => bodySeal(c, b) },
+               sp: { name: "冰旋球！", speed: 17, rgb: "150,230,255", fx: "wobble", hurt: "凍、凍住了", freeze: true }, trait: "nose", tdesc: "鼻子頂球：每分一次自動救球", stDrain: 1.0,
+               draw: (c, b) => bodySeal(c, b) },
     bear:    { name: "北極熊", speed: 5.4, jump: 4.0, reach: 1.75, dive: 2.8, power: 1.25, meter: 1.0, band: "#5aa9ff", tag: "最慢但力量最大、手最長",
-               sp: { name: "冰原重砲！", speed: 36, rgb: "200,235,255", fx: "none", hurt: "好、好重…", stun: 1.3 }, draw: (c) => bodyBear(c) },
+               sp: { name: "冰原重砲！", speed: 36, rgb: "200,235,255", fx: "none", hurt: "好、好重…", stun: 1.3 }, trait: "heavy", tdesc: "重砲：蓄滿 MAX 的球接到會被震暈；體力耗一半", stDrain: 0.5,
+               draw: (c) => bodyBear(c) },
     zap:     { name: "電電鼠", speed: 7.0, jump: 5.4, reach: 1.3, dive: 3.0, power: 0.95, meter: 1.35, band: "#e8483b", tag: "快、集氣快、手短",
-               sp: { name: "電電衝擊！", speed: 30, rgb: "255,240,90", fx: "zigzag", hurt: "麻、麻痺了…", stun: 1.4 }, draw: (c) => bodyZap(c) },
+               sp: { name: "電電衝擊！", speed: 30, rgb: "255,240,90", fx: "zigzag", hurt: "麻、麻痺了…", stun: 1.4 }, trait: "static", tdesc: "靜電：完美擊球會電麻對手", stDrain: 1.0,
+               draw: (c) => bodyZap(c) },
   };
   // taunts: each character's own win/lose lines, mixed with lines for what just happened (ev)
   const LINES = {
@@ -204,7 +213,7 @@
   // ---------- state
   const makeBody = (side) => ({ side, x: 0, y: 0, vx: 0, vy: 0, face: 1, swing: 0, swingT: 0, swingCd: 0, shot: "drive",
     meter: 0, armed: false, stun: 0, frozen: 0, bubble: "", bubbleT: 9, clap: 0, hop: 0, willMiss: false,
-    charging: false, chargeT: 0, diveT: 0, diveVx: 0, diveVy: 0, recover: 0, slide: 0, z: 0, vz: 0, swingAgo: 9, spinT: 0, netFace: 0 });
+    charging: false, chargeT: 0, diveT: 0, diveVx: 0, diveVy: 0, recover: 0, slide: 0, z: 0, vz: 0, swingAgo: 9, spinT: 0, netFace: 0, st: 1, panted: false, dj: false, noseUsed: false });
   const roo = makeBody(0), seal = makeBody(1);
   const ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, live: false, kind: "normal", t: 0, curve: 0, trail: [], netted: false, squash: 0, power: 0 };
   const rings = [];                      // impact shockwaves (screen space)
@@ -286,6 +295,8 @@
   function serveX() { const r = serveCourt() === "right" ? 1.4 : -1.4; return score.server === 0 ? r : -r; }
   function placeForServe() {
     const srv = score.server, sx = serveX(), rx = -sx * 1.15;
+    const newGame = score.pts[0] + score.pts[1] === 0;                     // stamina: a little back per point, full at each new game
+    for (const b of [roo, seal]) { b.st = newGame ? 1 : Math.min(1, b.st + ST_POINT); b.noseUsed = false; b.dj = false; }
     Object.assign(roo, { x: srv === 0 ? sx : rx, y: srv === 0 ? -0.5 : 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
     Object.assign(seal, { x: srv === 1 ? sx : rx, y: srv === 1 ? L + 0.5 : L - 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
   }
@@ -359,6 +370,9 @@
       lastHitter = b.side; bounces = 0; ball.netted = false; b.swing = 1; ball.power = 0;
       return;
     }
+    if (ball.heavy) {                                                     // bear trait: receiving a heavy ball
+      ball.heavy = false; b.stun = Math.max(b.stun, 0.35); say(b, "好、好重！"); shake = Math.max(shake, 0.5); burst(hp.x, hp.y, 16, "#dfefff", 200, 0.5);
+    }
     ball.kind = "normal"; ball.curve = 0; ball.spin = shot === "lob" ? "top" : shot === "drop" ? "slice" : "flat";
     const S = SHOTS[shot];
     let speed = S.speed, depth = S.depth(), power = S.power;
@@ -388,6 +402,11 @@
     launch(tx, ty, speed);
     if (ball.curve) ball.vx -= ball.curve * (Math.abs(ball.vy) > 0 ? (ty - ball.y) / ball.vy : 1) / 2;   // curve still lands on target
     lastHitter = b.side; bounces = 0; ball.netted = false; ball.t = 0; ball.power = power; ball.lastShot = shot;
+    const ch = charOf(b.side), foe = b.side === 0 ? seal : roo;
+    if (ch.trait === "heavy" && charge >= 0.95 && ball.kind === "normal") { ball.heavy = true; msg = "重砲！"; msgT = 0; }
+    if (ch.trait === "static" && quality === "perfect") {                 // electric mouse trait: perfect hit zaps the other side
+      foe.stun = Math.max(foe.stun, 0.3); say(foe, "滋滋…"); const fp = P(foe.x, foe.y, 1); burst(fp.x, fp.y, 18, "#fff27a", 180, 0.4, 0);
+    }
     b.swing = 1; b.swingT = 0; b.charging = false; b.chargeT = 0;
     impact(hp.x, hp.y, power, color);
   }
@@ -436,6 +455,7 @@
       const out = Math.abs(ball.x) > HALF_W + 0.08 || ball.y < -0.05 || ball.y > L + 0.05;
       if (side === lastHitter) awardPoint(1 - lastHitter, lastHitter === 0 ? "沒過網" : opp().name + "沒過網", "net");
       else if (bounces === 0 && out) awardPoint(1 - lastHitter, "出界！", "out");
+      else if (bounces === 1 && noseSave(side)) { /* seal trait: saved with the nose */ }
       else if (++bounces >= 2) awardPoint(lastHitter, lastHitter === 0 ? opp().name + "沒接到！" : "沒接到…");
     }
     if (ball.y < -9 || ball.y > L + 9 || Math.abs(ball.x) > 13) {
@@ -457,21 +477,34 @@
     // seal: swings automatically when in reach (unless it decided to whiff this one)
     if (lastHitter === 0 && ball.y > NET_Y - 0.5 && seal.stun <= 0) {
       const d = Math.hypot(ball.x - seal.x, ball.y - seal.y);
-      if (d < opp().reach * 0.95 && ball.z < REACH_Z && !seal.willMiss) {
-        const lob = Math.random() < 0.22;
-        hitBall(seal, lob ? "lob" : "drive", "good", roo.x > 0 ? (Math.random() < 0.7 ? -1 : 1) : (Math.random() < 0.7 ? 1 : -1));
+      const air = seal.z > 0.15, reach = opp().reach * 0.95 * (air ? SMASH_REACH : 1);
+      if (d < reach && ball.z < REACH_Z + seal.z * 1.6 && ball.z > seal.z - 0.3 && !seal.willMiss) {
+        const lob = Math.random() < 0.22, shot = air && ball.z > 1.8 ? "smash" : lob ? "lob" : "drive";
+        // AI flavour of the traits it can't "press": bear sometimes hits a heavy ball, electric mouse sometimes zaps
+        const q = opp().trait === "static" && Math.random() < 0.2 ? "perfect" : "good";
+        hitBall(seal, shot, q, roo.x > 0 ? (Math.random() < 0.7 ? -1 : 1) : (Math.random() < 0.7 ? 1 : -1), opp().trait === "heavy" && Math.random() < 0.3 ? 1 : 0);
       }
     }
   }
 
+  // seal trait: the ball is about to bounce twice right next to a seal -> it heads it back (weak lob), once per point
+  function noseSave(side) {
+    const b = side === 0 ? roo : seal;
+    if (charOf(side).trait !== "nose" || b.noseUsed || b.stun > 0 || b.frozen > 0 || Math.hypot(ball.x - b.x, ball.y - b.y) > 2.2) return false;
+    b.noseUsed = true; ball.z = 0.8; ball.kind = "normal"; ball.curve = 0; ball.spin = "flat"; ball.heavy = false;
+    launch((Math.random() - 0.5) * 3, side === 0 ? NET_Y + 4 : NET_Y - 4, 10);
+    lastHitter = side; bounces = 0; ball.netted = false; ball.t = 0; ball.lastShot = "nose"; rally++;
+    msg = "鼻子頂球！"; msgT = 0; say(b, "頂！"); const hp = P(ball.x, ball.y, ball.z); impact(hp.x, hp.y, 0.3, "#bff1ff");
+    return true;
+  }
   // predict where the ball can be taken on a side: first spot after the bounce at a comfortable height
-  function predict(side) {
+  function predict(side, zMax = 1.3) {
     let x = ball.x, y = ball.y, z = ball.z, vx = ball.vx, vy = ball.vy, vz = ball.vz, b = 0, land = null;
     for (let i = 0; i < 400; i++) {
       const dt = 1 / 100; vx += ball.curve * dt; x += vx * dt; y += vy * dt; vz -= G * dt; z += vz * dt;
       if (z <= 0 && vz < 0) { const bo = BOUNCE[ball.spin || "flat"]; z = 0; vz = -vz * bo.kz; vx *= bo.kxy; vy *= bo.kxy; b++; if (!land) land = { x, y }; if (b >= 2) break; }
       const mine = side === 0 ? y < NET_Y : y > NET_Y;
-      if (mine && b === 1 && vz < 0 && z < 1.3) return { x, y, land };
+      if (mine && b === 1 && vz < 0 && z < zMax) return { x, y, land };
     }
     return { x, y, land };
   }
@@ -480,10 +513,16 @@
   function moveBody(b, ix, iy, speed, dt) {
     if (b.frozen > 0) { b.frozen -= dt; ix = iy = 0; }
     if (b.stun > 0) { b.stun -= dt; ix = iy = 0; }
+    const ch = charOf(b.side), moving = Math.hypot(ix, iy) > 0.05;
+    const use = (moving ? ST_RUN : -ST_REST) + (b.charging ? ST_CHARGE : 0);
+    b.st = clamp(b.st - use * (use > 0 ? ch.stDrain : 1) * dt, 0, 1);
+    if (b.st < 0.2 && !b.panted) { b.panted = true; say(b, "喘…喘…"); } else if (b.st > 0.5) b.panted = false;
+    speed *= ST_MIN + ST_SPAN * b.st;
+    if (ch.trait === "burst" && b.st > 0.7) speed *= 1.15;
     const len = Math.hypot(ix, iy) || 1;
     b.vx = ix / len * speed * Math.min(1, Math.hypot(ix, iy)); b.vy = iy / len * speed * Math.min(1, Math.hypot(ix, iy));
     b.x = clamp(b.x + b.vx * dt, -6.2, 6.2);
-    b.y = b.side === 0 ? clamp(b.y + b.vy * dt, -2.8, NET_Y - 1) : clamp(b.y + b.vy * dt, NET_Y + 1, L + 2);
+    b.y = b.side === 0 ? clamp(b.y + b.vy * dt, -2.8, NET_Y - 1) : clamp(b.y + b.vy * dt, NET_Y + 1, L + 3.2);
     b.hop = Math.hypot(b.vx, b.vy) > 0.5 ? b.hop + dt * 13 : 0;
     b.swing = Math.max(0, b.swing - dt * 4); b.swingT = Math.max(0, b.swingT - dt); b.swingCd = Math.max(0, b.swingCd - dt);
     b.clap = Math.max(0, b.clap - dt); b.bubbleT += dt; b.swingAgo += dt;
@@ -493,9 +532,16 @@
   let sealTarget = null, sealDecided = false;
   function stepSeal(dt) {
     const Lv = LEVELS[level];
+    if (seal.z > 0) { airStep(seal, dt); return; }
+    // high ball within reach: jump (and smash it, see stepBall)
+    const dB = Math.hypot(ball.x - seal.x, ball.y - seal.y), apex = REACH_Z + opp().jump * opp().jump / (2 * G) * 1.6;
+    if (phase === "rally" && lastHitter === 0 && !ball.netted && !seal.willMiss && seal.stun <= 0 && seal.frozen <= 0 && ball.y > NET_Y
+        && dB < opp().reach * SMASH_REACH && ball.z > REACH_Z - 0.2 && ball.z < apex - 0.3 && ball.vz < 2) {
+      seal.vz = opp().jump; seal.z = 0.001; seal.st = Math.max(0, seal.st - ST_JUMP); seal.vx *= 0.3; seal.vy *= 0.3;
+    }
     let tx = 0, ty = L - 1;
     if (phase === "rally" && lastHitter === 0 && !ball.netted) {
-      if (!sealDecided) { sealDecided = true; seal.willMiss = Math.random() < Lv.miss; sealTarget = predict(1); sealTarget.x += (Math.random() - 0.5) * Lv.err; }
+      if (!sealDecided) { sealDecided = true; seal.willMiss = Math.random() < Lv.miss; sealTarget = predict(1, REACH_Z - 0.3); sealTarget.x += (Math.random() - 0.5) * Lv.err; }
       tx = sealTarget.x - 0.35; ty = sealTarget.y + 0.5;
     } else { sealDecided = false; seal.willMiss = false; }
     // belly slide: a far ball gets a burst of speed (and a very undignified pose)
@@ -505,10 +551,18 @@
     moveBody(seal, clamp(tx - seal.x, -1, 1) * (Math.abs(tx - seal.x) > 0.1), clamp(ty - seal.y, -1, 1) * (Math.abs(ty - seal.y) > 0.15), Lv.speed * opp().speed / CHARS.seal.speed * (seal.slide > 0 ? 1.7 : 1), dt);
     if (seal.meter >= 1 && !seal.armed && phase === "rally" && lastHitter === 0 && Math.random() < dt * 0.8) { seal.armed = true; say(seal, "看我的" + opp().sp.name.replace("！", "")); }
   }
+  // airborne: keeps take-off velocity, no steering (either side)
+  function airStep(b, dt) {
+    b.vz -= G * dt; b.z += b.vz * dt;
+    b.x = clamp(b.x + b.vx * dt, -6.2, 6.2);
+    b.y = b.side === 0 ? clamp(b.y + b.vy * dt, -2.8, NET_Y - 1) : clamp(b.y + b.vy * dt, NET_Y + 1, L + 3.2);
+    b.swing = Math.max(0, b.swing - dt * 4); b.swingT = Math.max(0, b.swingT - dt); b.swingCd = Math.max(0, b.swingCd - dt); b.bubbleT += dt;
+    if (b.z <= 0) { b.z = 0; b.vz = 0; b.dj = false; const p = P(b.x, b.y); burst(p.x, p.y, 8, "rgba(200,215,240,.8)", 90, 0.35, 150); beep(140, 0.08, "sine", 0.12); }
+  }
   function stepRoo(dt) {
     if (roo.diveT > 0) {                                                  // mid-dive: flying toward the ball
       roo.diveT -= dt; roo.x = clamp(roo.x + roo.diveVx * dt, -6.2, 6.2); roo.y = clamp(roo.y + roo.diveVy * dt, -2.8, NET_Y - 1);
-      if (roo.diveT <= 0) { roo.recover = 0.55; const p = P(roo.x, roo.y); burst(p.x, p.y, 12, "rgba(200,215,240,.8)", 120, 0.4, 150); }
+      if (roo.diveT <= 0) { roo.recover = me().trait === "slide" ? 0.08 : 0.55; const p = P(roo.x, roo.y); burst(p.x, p.y, 12, "rgba(200,215,240,.8)", 120, 0.4, 150); }   // penguin: back up at once
       roo.swing = Math.max(0, roo.swing - dt * 3); roo.bubbleT += dt; return;
     }
     if (roo.recover > 0) { roo.recover -= dt; moveBody(roo, 0, 0, 0, dt); return; }
@@ -517,13 +571,7 @@
       if (lastHitter !== 1 || phase !== "rally" || bounces >= 2) { roo.charging = false; roo.chargeT = 0; }
       if (roo.chargeT > 0.9 && roo.chargeT - dt <= 0.9) beep(1320, 0.12, "triangle", 0.08);
     }
-    if (roo.z > 0) {                                                      // airborne: keeps take-off velocity, no steering
-      roo.vz -= G * dt; roo.z += roo.vz * dt;
-      roo.x = clamp(roo.x + roo.vx * dt, -6.2, 6.2); roo.y = clamp(roo.y + roo.vy * dt, -2.8, NET_Y - 1);
-      roo.swing = Math.max(0, roo.swing - dt * 4); roo.swingT = Math.max(0, roo.swingT - dt); roo.swingCd = Math.max(0, roo.swingCd - dt); roo.bubbleT += dt;
-      if (roo.z <= 0) { roo.z = 0; roo.vz = 0; const p = P(roo.x, roo.y); burst(p.x, p.y, 8, "rgba(200,215,240,.8)", 90, 0.35, 150); beep(140, 0.08, "sine", 0.12); }
-      return;
-    }
+    if (roo.z > 0) { airStep(roo, dt); return; }
     const ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), iy = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
     moveBody(roo, ix, iy, me().speed * (roo.charging ? 0.47 : 1), dt);                  // charging slows you down: commit early or keep running
   }
@@ -549,14 +597,21 @@
     if (incoming && d < me().reach && inReachZ()) { roo.swingT = 0.2; roo.swingCd = 0.35; }                   // in reach: swing now
     else if (incoming && ball.y < NET_Y && d < me().dive && ball.z < 2.2 && (ball.vy < 0 || bounces === 1)) {    // just out of reach: dive
       const k = 1 / 0.26; roo.diveT = 0.26; roo.diveVx = (ball.x - roo.x) * k * 0.8; roo.diveVy = (ball.y - roo.y) * k * 0.8;
-      roo.swingCd = 0.8; say(roo, "飛撲！"); beep(330, 0.15, "sawtooth", 0.08, 1.8);
+      roo.st = Math.max(0, roo.st - ST_DIVE * (me().trait === "slide" ? 0.3 : 1));
+      roo.swingCd = 0.8; say(roo, me().trait === "slide" ? "肚子滑～" : "飛撲！"); beep(330, 0.15, "sawtooth", 0.08, 1.8);
     } else if (incoming) { roo.charging = true; roo.chargeT = 0; roo.swing = 0.3; beep(520, 0.08, "sine", 0.06, 1.5); }  // early: charge up
     else { roo.swingT = 0.2; roo.swingCd = 0.35; }
   }
   function jump() {
     if (phase === "intro" || phase === "over") { startMatch(); return; }
-    if (phase !== "rally" || roo.z > 0 || roo.diveT > 0 || roo.recover > 0 || roo.frozen > 0 || roo.stun > 0) return;
-    roo.vz = me().jump; roo.z = 0.001; beep(420, 0.12, "sine", 0.08, 1.6);
+    if (phase !== "rally" || roo.diveT > 0 || roo.recover > 0 || roo.frozen > 0 || roo.stun > 0) return;
+    if (roo.z > 0) {                                                      // kangaroo trait: one more jump in the air
+      if (me().trait !== "dj" || roo.dj) return;
+      roo.dj = true; roo.vz = me().jump * 0.85; roo.st = Math.max(0, roo.st - ST_JUMP); say(roo, "二段跳！"); beep(620, 0.12, "sine", 0.08, 1.6);
+      if (roo.swingT > 0) roo.swingT = (roo.vz + Math.sqrt(roo.vz * roo.vz + 2 * G * roo.z)) / G + 0.05;   // racket stays ready till the new landing
+      return;
+    }
+    roo.vz = me().jump * (0.85 + 0.15 * roo.st); roo.z = 0.001; roo.st = Math.max(0, roo.st - ST_JUMP); beep(420, 0.12, "sine", 0.08, 1.6);
     const p = P(roo.x, roo.y); burst(p.x, p.y, 6, "rgba(200,215,240,.8)", 80, 0.3, 150);
   }
   // ball height the kangaroo can reach: standing REACH_Z, jumping adds its height (with a longer arm overhead)
@@ -747,20 +802,14 @@
   function bodyZap(c) {
     const fur = "#f7d23a", shade = "#c9a41c", brown = "#8a5a1c";
     ctx.fillStyle = brown; ctx.beginPath(); ctx.moveTo(-20, -30); ctx.lineTo(-30, -44); ctx.lineTo(-22, -48); ctx.lineTo(-14, -36); ctx.fill();
-    if (PUBLIC_BUILD) {                                                   // public look: round spark-ball tail
-      ctx.strokeStyle = fur; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-22, -40); ctx.quadraticCurveTo(-44, -50, -48, -72); ctx.stroke();
-      E("#9fd8ff", -50, -80, 13, 13); E("#ffffff", -54, -84, 4, 4);
-    } else {
-      ctx.fillStyle = fur; ctx.beginPath();                                // lightning-bolt tail
-      [[-26, -44], [-46, -62], [-36, -68], [-60, -94], [-48, -98], [-76, -130], [-40, -106], [-50, -100], [-24, -78], [-32, -72], [-20, -52]].forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
-      ctx.fill();
-    }
+    // round spark-ball tail
+    ctx.strokeStyle = fur; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-22, -40); ctx.quadraticCurveTo(-44, -50, -48, -72); ctx.stroke();
+    E("#9fd8ff", -50, -80, 13, 13); E("#ffffff", -54, -84, 4, 4);
     E(shade, 6, -4, 20, 6); E(fur, 0, -50, 30, 42);
     E(brown, -24, -64, 3.5, 10, 0.5); E(brown, -26, -46, 3.5, 10, 0.5);
-    const tip = PUBLIC_BUILD ? "#2f5fd0" : "#1d1d1d", ear = PUBLIC_BUILD ? 18 : 26, lift = PUBLIC_BUILD ? 8 : 0;
-    E(fur, 4, -146 + lift, 8, ear, -0.35); E(tip, -4 + lift * 0.35, -166 + lift * 2, 5, 9, -0.35);
-    E(fur, 36, -148 + lift, 8, ear, 0.3); E(tip, 44 - lift * 0.3, -168 + lift * 2, 5, 9, 0.3);
-    E(fur, 20, -108, 28, 24); eye(33, -115, 3.8); E(PUBLIC_BUILD ? "#ff8a3d" : "#e8483b", 40, -100, 6, 6); E("#3a2a18", 47, -108, 1.6, 1.3);
+    E(fur, 4, -138, 8, 18, -0.35); E("#2f5fd0", -1, -150, 5, 9, -0.35);   // short ears, blue tips
+    E(fur, 36, -140, 8, 18, 0.3); E("#2f5fd0", 42, -152, 5, 9, 0.3);
+    E(fur, 20, -108, 28, 24); eye(33, -115, 3.8); E("#ff8a3d", 40, -100, 6, 6); E("#3a2a18", 47, -108, 1.6, 1.3);
     return shade;
   }
   function bodySeal(c, b) {
@@ -855,6 +904,10 @@
     ctx.font = '400 26px "Bungee", "Noto Sans TC", sans-serif'; ctx.fillStyle = "#f6c453"; ctx.fillText(score.games[0], W / 2 - 135, 54);
     ctx.fillStyle = "#7fe0ff"; ctx.fillText(score.games[1], W / 2 + 135, 54);
     meterBar(W / 2 - 135, 74, roo.meter, "#ff8a3a", roo.armed); meterBar(W / 2 + 135, 74, seal.meter, `rgb(${opp().sp.rgb})`, seal.armed);
+    for (const [x, b] of [[W / 2 - 135, roo], [W / 2 + 135, seal]]) {       // stamina: green -> red as it runs out
+      ctx.fillStyle = "rgba(255,255,255,.1)"; ctx.fillRect(x - 50, 83, 100, 3);
+      ctx.fillStyle = b.st > 0.5 ? "#5ee08a" : b.st > 0.2 ? "#f6c453" : "#ff5a4a"; ctx.fillRect(x - 50, 83, 100 * b.st, 3);
+    }
     ctx.fillStyle = "#f3f1ea"; ctx.font = '400 20px "Bungee", "Noto Sans TC", sans-serif'; ctx.fillText(pointLabel(), W / 2, 40);
     ctx.font = '500 12px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#a9b0cf"; ctx.fillText(score.server === 0 ? "● " + me().name + "發球" : opp().name + "發球 ●", W / 2, 66);
     if (phase === "serve") { ctx.fillStyle = "#f6c453"; ctx.fillText(serveCourt() === "right" ? "右區發球" : "左區發球", W / 2, 80); }
@@ -945,14 +998,14 @@
     row(charsEl, "自己", Object.keys(CHARS), charId, setChar);
     row(oppsEl, "對手", OPP_IDS, oppPick, setOpp);
     const c = me(), o = oppPick === "random" ? "隨機（開打時抽）" : `${opp().name}：${opp().tag}`;
-    cstat.textContent = `${c.name}：${c.tag}｜必殺 ${c.sp.name.replace("！", "")}　　對手 ${o}`;
+    cstat.textContent = `${c.name}：${c.tag}｜特技 ${c.tdesc}｜必殺 ${c.sp.name.replace("！", "")}　　對手 ${o}`;
   }
   function setChar(id) { charId = id; try { localStorage.setItem("roo-seal-char", id); } catch (e) {} renderChars(); }
   function setOpp(id) { oppPick = id; if (id !== "random") oppId = id; try { localStorage.setItem("roo-seal-opp", id); } catch (e) {} renderChars(); }
   function showOverlay(title, text, btn) { ovTitle.textContent = title; ovText.textContent = text; overlay.dataset.mode = "text"; ovBtn.textContent = btn; overlay.hidden = false; charsEl.hidden = oppsEl.hidden = cstat.hidden = phase === "paused"; }
   function startMatch() {
     score.pts = [0, 0]; score.games = [0, 0]; score.server = 0; msg = ""; overlay.hidden = true; bestRally = 0; resolveOpp();
-    for (const b of [roo, seal]) { b.meter = 0; b.armed = false; b.bubble = ""; }
+    for (const b of [roo, seal]) { b.meter = 0; b.armed = false; b.bubble = ""; b.st = 1; }
     particles.length = 0; startServe();
   }
   function togglePause() {
@@ -977,7 +1030,7 @@
     canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
   }
   new ResizeObserver(resize).observe(canvas); resize();
-  if (location.hash === "#test") window.__g = { roo, seal, ball, keys, score, awardPoint, startMatch, smashSpot, swing, jump, hitBall, me, opp, predict, serveCourt, get phase() { return phase; }, set phase(v) { phase = v; }, set lastHitter(v) { lastHitter = v; }, get msg() { return msg; }, set msg(v) { msg = v; } };
+  if (location.hash === "#test") window.__g = { roo, seal, ball, keys, score, awardPoint, startMatch, smashSpot, swing, jump, hitBall, me, opp, predict, serveCourt, get phase() { return phase; }, set phase(v) { phase = v; }, set lastHitter(v) { lastHitter = v; }, get lastHitter() { return lastHitter; }, get bounces() { return bounces; }, get msg() { return msg; }, set msg(v) { msg = v; } };
   if (oppPick !== "random") oppId = oppPick;
   renderChars(); placeForServe();
   requestAnimationFrame(frame);
