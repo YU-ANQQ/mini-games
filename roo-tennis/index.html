@@ -103,9 +103,20 @@
   body.touch #clip { width: 18%; top: 8px; right: 8px; } body.touch #clip.big { width: 24%; }   /* phones: the clip must not hide the ball */
   body.touch .chars button, body.touch .chars .lab { flex: none; white-space: nowrap; }
   .rotate { color: var(--accent); font-size: 14px; }
+  /* portrait phone: the court is only ~62vw tall, so the HUD moves into a tray in the empty space below it */
+  .tray { display: none; }
+  .tray .tside { display: grid; gap: 3px; justify-items: center; font-size: 15px; }
+  .tray .tg { font: 400 28px "Bungee", "Noto Sans TC", sans-serif; line-height: 1; } .tray .t0 { color: #f6c453; } .tray .t1 { color: #7fe0ff; }
+  .tray .bar { display: block; width: 100%; height: 9px; border-radius: 5px; background: linear-gradient(90deg, var(--c, #ff8a3a) calc(var(--v, 0) * 100%), rgba(255,255,255,.12) 0); }
+  .tray .bar.st { height: 7px; }
+  .tray .tmid { display: grid; gap: 4px; justify-items: center; align-content: start; text-align: center; }
+  .tray .tpts { font: 400 22px "Bungee", "Noto Sans TC", sans-serif; } .tray #t-srv { color: var(--dim); font-size: 13px; }
+  .tray .thint { color: var(--accent); font-size: 15px; font-weight: 700; min-height: 2.6em; line-height: 1.3; white-space: pre-line; }
   @media (orientation: landscape) { .rotate { display: none !important; } }
   @media (orientation: portrait) {                                  /* portrait phone: stage on top, controls get the space below */
-    body.touch .wrap { place-items: start center; }
+    body.touch .wrap { place-items: start center; align-content: start; }
+    body.touch .tray { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 10px; width: 100%; box-sizing: border-box; padding: 12px 14px; background: var(--panel); position: relative; z-index: 5; pointer-events: none; }
+    body.touch #pausebtn { position: fixed; top: auto; left: auto; right: 16px; bottom: 250px; z-index: 6; }   /* reachable by the right thumb */
     #stick { height: calc(100% - 62.5vw); top: auto; }
     .acts { bottom: 40px; }
   }
@@ -161,6 +172,12 @@
         </ul>
       </details>
     </div>
+  </div>
+
+  <div class="tray" id="tray" aria-hidden="true">
+    <div class="tside"><b id="t-n0"></b><span class="tg t0" id="t-g0"></span><i class="bar" id="t-m0"></i><i class="bar st" id="t-s0"></i></div>
+    <div class="tmid"><div class="tpts" id="t-pts"></div><div id="t-srv"></div><div class="thint" id="t-hint"></div></div>
+    <div class="tside"><b id="t-n1"></b><span class="tg t1" id="t-g1"></span><i class="bar" id="t-m1"></i><i class="bar st" id="t-s1"></i></div>
   </div>
 
   <div class="pad" id="pad" aria-label="觸控操作">
@@ -318,6 +335,7 @@
   // touch mode: phones / tablets (or a very narrow window) get the full-screen stage with the floating controls (CSS: body.touch)
   const touch = matchMedia("(pointer: coarse)").matches || innerWidth <= 640;
   document.body.classList.toggle("touch", touch);
+  const portraitMQ = matchMedia("(orientation: portrait)"), trayOn = () => touch && portraitMQ.matches;
   const buzz = (ms) => { if (touch && soundOn && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} };   // haptic hit feel (Android; iOS ignores)
 
   let level = "normal";
@@ -496,7 +514,7 @@
       score.games[winner]++; score.pts = [0, 0]; score.server = 1 - score.server; gag.netRip = null;   // groundskeeper fixed the net
       msg = nameOf(winner) + "拿下這一局";
       if (score.games[winner] >= gamesToWin) {
-        freeze = 0.7; flash = 0.7; shake = 1; msg = winner === 0 ? "比賽結束！贏了！" : "比賽結束…"; playClip(winner === 0 ? "win" : "lose", true); gag.crowd = "wild"; gag.crowdT = 0;   // match-winning point: long freeze-frame
+        freeze = 0.7; flash = 0.7; shake = 1; gag.timeStopT = 0; msg = winner === 0 ? "比賽結束！贏了！" : "比賽結束…"; playClip(winner === 0 ? (charId === "hulk" ? "win" : charId) : (oppId === "cap" ? "lose" : oppId), true); gag.crowd = "wild"; gag.crowdT = 0;   // match-winning point: long freeze-frame
         phase = "over";
         setTimeout(() => {                                                  // skip if a new match / the menu started meanwhile
           if (phase !== "over") return;
@@ -603,8 +621,8 @@
     let speed = S.speed, depth = S.depth(), power = S.power;
     speed *= charOf(b.side).power;
     if (S.label) { msg = S.label; msgT = 0; }
-    if (shot === "smash" && charOf(b.side).trait === "hi") speed *= 1.3;   // rabbit: smash king
     if (shot === "smash" && quality === "perfect") { speed = 36; power = 1; msg = "完美扣殺！"; freeze = 0.2; }
+    if (shot === "smash" && charOf(b.side).trait === "hi") speed *= 1.3;   // rabbit: smash king (after the perfect-smash override, so it stays faster)
     else if (quality === "perfect") { speed *= 1.18; power = Math.max(power, 0.6); msg = S.label ? "完美" + S.label : "NICE!"; msgT = 0; }
     if (quality === "dive") { speed *= 0.85; power = 0.45; }
     if (charge > 0) { speed *= 1 + 0.38 * charge; power = Math.max(power, 0.35 + 0.6 * charge); if (charge >= 0.95) { msg = "MAX!"; msgT = 0; } }
@@ -750,9 +768,10 @@
       const d = Math.hypot(ball.x - seal.x, ball.y - seal.y);
       const air = seal.z > 0.15, reach = opp().reach * 0.95 * (air ? SMASH_REACH : 1);
       if (d < reach && ball.z < REACH_Z + seal.z * 1.6 && ball.z > seal.z - 0.3 && !seal.willMiss) {
-        const lob = Math.random() < 0.22, shot = air && ball.z > 1.8 ? "smash" : lob ? "lob" : "drive";
+        const lob = Math.random() < 0.22, shot = air && ball.z > 1.8 ? "smash" : lob ? "lob" : bounces === 0 ? "volley" : "drive";
         // AI flavour of the traits it can't "press": bear sometimes hits a heavy ball, electric mouse sometimes zaps
-        const q = opp().trait === "static" && Math.random() < 0.2 ? "perfect" : "good";
+        const t = opp().trait;
+        const q = t === "static" && Math.random() < 0.2 ? "perfect" : t === "precise" && d < PERFECT_D * PRECISE_K && Math.random() < 0.5 ? "perfect" : t === "slide" && seal.slide > 0 ? "dive" : "good";
         hitBall(seal, shot, q, roo.x > 0 ? (Math.random() < 0.7 ? -1 : 1) : (Math.random() < 0.7 ? 1 : -1), opp().trait === "heavy" && Math.random() < 0.3 ? 1 : 0);
       }
     }
@@ -762,7 +781,7 @@
   function noseSave(side) {
     const b = side === 0 ? roo : seal;
     if (charOf(side).trait !== "nose" || b.noseUsed >= 3 || b.stun > 0 || b.frozen > 0 || Math.hypot(ball.x - b.x, ball.y - b.y) > 2.2) return false;
-    b.noseUsed = (b.noseUsed || 0) + 1; ball.z = 0.8; ball.kind = "normal"; ball.curve = 0; ball.spin = "flat"; ball.heavy = false;
+    b.noseUsed = (b.noseUsed || 0) + 1; ball.z = 0.8; ball.kind = "normal"; ball.curve = 0; ball.spin = "flat"; ball.heavy = false; ball.yeet = false; ball.rage = false;   // a nose return is always a harmless lob
     launch((Math.random() - 0.5) * 3, side === 0 ? NET_Y + 4 : NET_Y - 4, 10);
     lastHitter = side; bounces = 0; ball.netted = false; ball.t = 0; ball.lastShot = "nose"; rally++;
     msg = "鼻子頂球！"; msgT = 0; say(b, "頂！"); const hp = P(ball.x, ball.y, ball.z); impact(hp.x, hp.y, 0.3, "#bff1ff");
@@ -1026,6 +1045,13 @@
       ctx.beginPath(); ctx.arc(p.x, p.y - 190 * s, 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * c); ctx.stroke();
       if (full) { ctx.font = '400 13px "Bungee", sans-serif'; ctx.fillStyle = "#ffd65a"; ctx.textAlign = "center"; ctx.fillText("MAX", p.x, p.y - 212 * s - Math.abs(Math.sin(t * 10)) * 3); }
     }
+    const spd = Math.hypot(b.vx, b.vy);
+    if (ch.trait === "burst" && spd > 6 && !b.z && !stuck) {                  // cheetah: fading afterimages trailing the run
+      for (let k = 3; k >= 1; k--) {
+        const gp = P(b.x - b.vx * 0.045 * k, b.y - b.vy * 0.045 * k);
+        ctx.save(); ctx.globalAlpha = 0.14 * (4 - k); ctx.translate(gp.x, gp.y); ctx.scale(s * b.face, s); ch.draw(ch, b); ctx.restore();
+      }
+    }
     ctx.save(); ctx.translate(p.x, p.y - bob - clapBob); ctx.scale(s * b.face, s); glow(b, `rgba(${ch.sp.rgb},.55)`);
     if (b.slide > 0) {                                                     // seal belly slide
       ctx.rotate(1.2);
@@ -1049,7 +1075,8 @@
     if (shade && !(b.noRacketT > 0)) drawRacket(b, b.armed ? `rgb(${ch.sp.rgb})` : b.charging ? "#ffd65a" : ch.band, shade);
     if (b.frozen > 0) { ctx.fillStyle = "rgba(190,240,255,.55)"; ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.rect(-60, -178, 140, 182); ctx.fill(); ctx.stroke(); }
     if (b.charging && ch.trait === "heavy") {                              // bear charging = eating lunch: open bento above the head
-      ctx.save(); ctx.translate(10, -200 - Math.abs(Math.sin(performance.now() / 120)) * 4);
+      ctx.save(); ctx.translate(34, -112 - Math.abs(Math.sin(performance.now() / 120)) * 4); ctx.scale(1.7, 1.7);   // held at the chest (the bubble sits above the head)
+      ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-4, -24); ctx.lineTo(8, -2); ctx.moveTo(2, -26); ctx.lineTo(12, -3); ctx.stroke();   // chopsticks
       ctx.fillStyle = "#b8322a"; ctx.fillRect(-26, -12, 52, 24); ctx.fillStyle = "#fff8ec"; ctx.fillRect(-22, -9, 26, 18);
       E("#e9a23b", 13, 0, 7, 6); E("#6fbf4a", 13, -6, 5, 3); E("#e2483a", -12, -2, 4, 4);   // egg, greens, plum on the rice
       ctx.restore();
@@ -1256,7 +1283,8 @@
   // HUD_TOUCH: on phones the 960-wide canvas shrinks to ~40-65%, so the score panel and the call-outs are drawn bigger
   const HUD_TOUCH = 1.3;
   function drawHUD() {
-    const U = touch ? HUD_TOUCH : 1;
+    const U = touch ? HUD_TOUCH : 1, tray = trayOn();                      // portrait phone: score, bars and hints live in the DOM tray under the court
+    if (!tray) {
     ctx.save(); ctx.translate(W / 2, 0); ctx.scale(U, U); ctx.translate(-W / 2, 0);   // score panel, scaled around the top centre
     ctx.fillStyle = "rgba(14,17,34,.8)"; roundRect(W / 2 - 220, 10, 440, 86, 10); ctx.fill();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -1282,13 +1310,20 @@
     if (phase === "serve") { ctx.fillStyle = "#f6c453"; ctx.fillText(serveCourt() === "right" ? "右區發球" : "左區發球", W / 2, 80); }
     ctx.font = '700 14px "Noto Sans TC", sans-serif';
     if (roo.zen && !roo.armed && phase !== "over") { ctx.fillStyle = "#ffd65a"; ctx.fillText("無我境界（完美區 ×2）", W / 2 - 135, 102); }
-    if (roo.armed && phase !== "over") { ctx.fillStyle = `rgb(${me().sp.rgb})`; ctx.fillText("下一球自動必殺！", W / 2 - 135, 102); }
-    ctx.restore(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (roo.armed && phase !== "over") {
+      ctx.fillStyle = `rgb(${me().sp.rgb})`; ctx.fillText("下一球自動必殺！", W / 2 - 135, 102);
+      ctx.font = '500 11px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#ffd65a"; ctx.fillText("超必殺：" + SUPERS[charId].hint, W / 2 - 135, 117);
+    }
+    ctx.restore();
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (!tray) {
     if (phase === "serve" && score.server === 0) { ctx.font = `700 ${18 * U}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#f3f1ea"; ctx.fillText(tossT < 0 ? (touch ? "按「打」拋球" : "按「打」拋球（←→ 方向、↑ 上旋、↓ 切球）") : "球在最高點時再按一次！", W / 2, H - 26); }   // under the near baseline, clear of the far player and the big texts
     if (counterChance()) {                                                // teach the counter when it matters
       ctx.font = `700 ${16 * U}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#8ff4ff";   // bottom edge: the top is busy with the caster's bubble and the special's name
       ctx.lineWidth = 4; ctx.strokeStyle = "rgba(10,12,28,.85)"; ctx.lineJoin = "round"; ctx.strokeText("提早按「打」蓄力或完美擊球＝退貨！", W / 2, H - 26); ctx.fillText("提早按「打」蓄力或完美擊球＝退貨！", W / 2, H - 26);
     } else if (phase === "rally" && rally >= 5) { ctx.font = `400 ${16 * U}px "Bungee", "Noto Sans TC", sans-serif`; ctx.fillStyle = "rgba(246,196,83,.9)"; ctx.fillText(`連續 ${rally} 拍`, W / 2, 110 + 22 * U); }
+    }
     if (msg && msgT < 1.4) {
       ctx.globalAlpha = Math.min(1, 1.6 - msgT); ctx.font = `400 ${36 * U}px "Bungee", "Noto Sans TC", sans-serif`;
       ctx.fillStyle = ball.kind === "sp" ? `rgb(${charOf(ball.owner).sp.rgb})` : "#f6c453";
@@ -1361,6 +1396,7 @@
       render();
       if (touch) {
         const cover = !overlay.hidden || !introEl.hidden; padEl.classList.toggle("off", cover); pauseEl.hidden = cover;
+        if (trayOn()) updateTray();
         const cnt = counterChance(); if (hitEl.classList.contains("counter") !== cnt) { hitEl.classList.toggle("counter", cnt); hitEl.textContent = cnt ? "退貨!" : "打"; }
       }
     } catch (e) { console.error(e); ctx.setTransform(1, 0, 0, 1, 0, 0); }
@@ -1438,6 +1474,25 @@
   document.getElementById("pausebtn").addEventListener("pointerdown", (e) => { e.preventDefault(); setKeys(false, false, false, false); togglePause(); });
 
   const hitEl = document.querySelector(".acts .hit");
+  // portrait tray: same information as the canvas score panel + the hint lines, written only when a value changes
+  const T = Object.fromEntries(["n0", "n1", "g0", "g1", "m0", "m1", "s0", "s1", "pts", "srv", "hint"].map((k) => [k, document.getElementById("t-" + k)]));
+  const setT = (k, v) => { if (T[k].textContent !== v) T[k].textContent = v; };
+  const setBar = (k, v, c) => { T[k].style.setProperty("--v", v.toFixed(3)); T[k].style.setProperty("--c", c); };
+  function updateTray() {
+    setT("n0", me().name); setT("n1", opp().name); setT("g0", String(score.games[0])); setT("g1", String(score.games[1]));
+    setBar("m0", roo.meter, roo.armed ? "#ffffff" : "#ff8a3a"); setBar("m1", seal.meter, seal.armed ? "#ffffff" : `rgb(${opp().sp.rgb})`);
+    for (const [k, b] of [["s0", roo], ["s1", seal]]) setBar(k, b.st, b.st > 0.5 ? "#5ee08a" : b.st > 0.2 ? "#f6c453" : "#ff5a4a");
+    const mp = phase === "serve" || phase === "rally" ? matchPointSide() : -1;
+    setT("pts", pointLabel() + (mp === 0 ? "　賽點" : mp === 1 ? "　對手賽點" : ""));
+    setT("srv", (score.server === 0 ? me().name : opp().name) + "發球" + (phase === "serve" ? "・" + (serveCourt() === "right" ? "右區" : "左區") : ""));
+    const hint = counterChance() ? "提早按「打」蓄力或完美擊球＝退貨！"
+      : phase === "serve" && score.server === 0 ? (tossT < 0 ? "按「打」拋球" : "球在最高點時再按一次！")
+      : roo.armed ? `下一球自動必殺！
+超必殺：${SUPERS[charId].hint}`
+      : roo.zen ? "無我境界（完美區 ×2）"
+      : phase === "rally" && rally >= 5 ? `連續 ${rally} 拍` : "";
+    setT("hint", hint);
+  }
   const padEl = document.getElementById("pad"), pauseEl = document.getElementById("pausebtn");
   if (touch) overlay.insertBefore(document.querySelector(".opts"), document.getElementById("ov-btn"));   // header is hidden in touch mode: difficulty / sound / 重選角色 live in the menu (and the pause screen)
   const charsEl = document.getElementById("chars"), oppsEl = document.getElementById("opps"), courtsEl = document.getElementById("courts"), setsEl = document.getElementById("sets"), cstat = document.getElementById("cstat");
