@@ -1,0 +1,985 @@
+<title>Roo vs Seal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+  /* Single-look game screen (dusk hard court): colours set explicitly for either host theme */
+  :root {
+    color-scheme: dark;
+    --bg: #14182b;
+    --panel: #1d2340;
+    --line: #34406e;
+    --text: #f3f1ea;
+    --dim: #a9b0cf;
+    --accent: #f6c453;
+    --accent-ink: #2a1c05;
+    --fire: #ff6a2a;
+    --ice: #7fe0ff;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    padding-inline: 16px;
+    padding-block: 20px 32px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }
+  .top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 20px; }
+  h1 { font-family: "Bungee", "Noto Sans TC", system-ui, sans-serif; font-weight: 400; font-size: clamp(24px, 5vw, 40px); margin: 0; line-height: 1; letter-spacing: .02em; }
+  h1 .roo { color: var(--accent); } h1 .vs { color: var(--dim); font-size: .6em; } h1 .seal { color: var(--ice); }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .seg button, .btn { font: inherit; font-size: 14px; color: var(--text); background: transparent; border: 0; padding: 7px 14px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .btn { border: 1px solid var(--line); border-radius: 999px; }
+  .btn:hover, .seg button:hover { background: var(--line); }
+  .seg button[aria-pressed="true"]:hover { background: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden; background: #1b2a55; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; background: rgba(12, 14, 30, .7); text-align: center; padding: 16px; }
+  .overlay[hidden] { display: none; }
+  .overlay h2 { font-family: "Bungee", "Noto Sans TC", system-ui, sans-serif; font-weight: 400; margin: 0; font-size: clamp(22px, 5vw, 44px); text-wrap: balance; }
+  .overlay ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--dim); font-size: clamp(12px, 2.2vw, 15px); line-height: 1.5; max-width: 42ch; text-align: left; }
+  .overlay li b { color: var(--text); font-weight: 700; }
+  .overlay p { margin: 0; color: var(--dim); max-width: 38ch; line-height: 1.6; }
+  .overlay[data-mode="text"] ul, .overlay:not([data-mode="text"]) p { display: none; }
+  .chars { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .chars button { font: inherit; font-size: 15px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+  .chars .lab { align-self: center; color: var(--dim); font-size: 13px; }
+  .chars button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+  .cstat { color: var(--dim); font-size: 13px; min-height: 1.4em; }
+  .play { font: inherit; font-weight: 700; font-size: 18px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; padding: 12px 28px; cursor: pointer; }
+  .play:hover { filter: brightness(1.08); }
+  /* touch pad (phones) */
+  .pad { display: none; justify-content: space-between; align-items: center; gap: 12px; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 56px); gap: 4px; }
+  .dpad button, .acts button {
+    font: inherit; font-weight: 700; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; touch-action: none; user-select: none; -webkit-user-select: none; font-size: 18px;
+  }
+  .dpad button.on, .acts button.on { background: var(--line); }
+  .dpad .u { grid-column: 2; grid-row: 1; } .dpad .l { grid-column: 1; grid-row: 2; } .dpad .r { grid-column: 3; grid-row: 2; } .dpad .d { grid-column: 2; grid-row: 3; }
+  .acts { display: grid; grid-template-columns: 76px 76px; grid-template-rows: 60px 60px; gap: 8px; }
+  .acts .hit { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); grid-row: span 2; border-radius: 999px; }
+  .acts .jump { grid-row: span 2; border-radius: 999px; }
+  @media (pointer: coarse) { .pad { display: flex; } .keys { display: none; } }
+  .help { display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--dim); font-size: 14px; line-height: 1.6; }
+  kbd { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text); }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <h1><span class="roo">Roo</span> <span class="vs">vs</span> <span class="seal">Seal</span></h1>
+    <div class="opts">
+      <div class="seg" role="group" aria-label="難度">
+        <button type="button" id="lv-easy" data-lv="easy" aria-pressed="false">簡單</button>
+        <button type="button" id="lv-normal" data-lv="normal" aria-pressed="true">普通</button>
+        <button type="button" id="lv-hard" data-lv="hard" aria-pressed="false">困難</button>
+      </div>
+      <button type="button" class="btn" id="sound" aria-pressed="true">音效：開</button>
+      <button type="button" class="btn" id="restart">重新開始</button>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="c" aria-label="袋鼠打海豹網球遊戲畫面"></canvas>
+    <div class="overlay" id="overlay">
+      <h2 id="ov-title">袋鼠打海豹</h2>
+      <ul>
+        <li>先選自己的角色（←→ 切換）和對手（↑↓ 切換，可選隨機），每隻速度、跳躍、手長、必殺技都不一樣。</li>
+        <li><b>方向鍵</b>移動，跑到球的落點（地上的黃圈）。</li>
+        <li>打球只有一顆鍵：<b>Z／空白鍵＝打</b>。球還沒到就先按＝<b>蓄力</b>，球一到自動打出，蓄滿是 MAX。</li>
+        <li>擊球瞬間按住 <b>↑ 高吊</b>、<b>↓ 小球</b>、<b>←→</b> 控制左右；球還沒落地就打＝<b>截擊</b>。</li>
+        <li><b>X＝跳</b>。高球會在地上標出紅色「<b>扣殺點</b>」：站進去，頭上出現「跳！」就跳，空中按一下打＝<b>扣殺</b>（球一進範圍自動打）。</li>
+        <li><b>發球</b>：每分左右區輪流（亮起的格子就是要發的地方）。按一次拋球、最高點再按＝完美發球；擊球時按住 <b>↑ 上旋</b>（彈高前竄）、<b>↓ 切球</b>（貼地滑）。</li>
+        <li>邊跑邊打，球會往跑的方向拐（側旋）；高吊自帶上旋、小球自帶切。</li>
+        <li>擊球會集氣（完美擊球、蓄滿 MAX 集得更快），集滿後<b>下一球自動打出</b>角色專屬必殺。</li>
+      </ul>
+      <p id="ov-text"></p>
+      <div class="chars" id="chars" role="group" aria-label="選角色"></div>
+      <div class="chars" id="opps" role="group" aria-label="選對手"></div>
+      <div class="cstat" id="cstat"></div>
+      <button type="button" class="play" id="ov-btn">開始比賽</button>
+    </div>
+  </div>
+
+  <div class="pad" aria-label="觸控操作">
+    <div class="dpad">
+      <button type="button" class="u" data-k="up" aria-label="上">▲</button>
+      <button type="button" class="l" data-k="left" aria-label="左">◀</button>
+      <button type="button" class="r" data-k="right" aria-label="右">▶</button>
+      <button type="button" class="d" data-k="down" aria-label="下">▼</button>
+    </div>
+    <div class="acts">
+      <button type="button" class="hit" data-k="hit">打</button>
+      <button type="button" class="jump" data-k="jump">跳</button>
+    </div>
+  </div>
+
+  <div class="help keys">
+    <span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> 移動</span>
+    <span><kbd>Z</kbd>／<kbd>空白鍵</kbd> 打（提早按＝蓄力）</span>
+    <span>擊球時 <kbd>↑</kbd> 高吊、<kbd>↓</kbd> 小球</span>
+    <span><kbd>X</kbd> 跳（高球跳起來打＝扣殺）</span>
+    <span><kbd>P</kbd> 暫停</span>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- world (metres) and projection: camera behind the kangaroo, court narrows into the distance
+  const W = 960, H = 600;
+  const L = 23.77, NET_Y = L / 2, NET_H = 0.95, HALF_W = 4.115, DOUBLES_HALF = 5.485, SERVICE = 6.4;
+  const G = 12, REACH_Z = 2.5, PERFECT_D = 0.6;   // horizontal reach lives in CHARS
+  // public build (GitHub Pages): publish.py flips this to true and renames the electric mouse; the drawing changes with it
+  const PUBLIC_BUILD = true;
+  const CHAR = 0.7;                      // character draw scale: small players on a big court (hit reach is in world metres, unaffected)
+  const SMASH_REACH = 1.4;               // airborne horizontal reach multiplier (overhead swing reaches further)
+  const TOSS_V = 6, APEX_OK = 0.08;     // serve toss speed; perfect-serve window (s) around the toss apex
+  const K = 78, Y0 = -3.2, YSPAN = L + 6.4, SCR_NEAR = 592, SCR_FAR = 152, FAR_SHRINK = 0.45;
+  const LEVELS = {
+    easy:   { speed: 4.2, miss: 0.22, err: 1.4, meter: 0.1 },
+    normal: { speed: 5.2, miss: 0.1,  err: 0.8, meter: 0.13 },
+    hard:   { speed: 6.2, miss: 0.03, err: 0.35, meter: 0.16 },
+  };
+  const POINT_NAMES = ["0", "15", "30", "40"], GAMES_TO_WIN = 3;
+  // playable characters: speed (m/s), jump (take-off m/s), reach / dive (m), power (shot speed x), meter (charge gain x),
+  // sp = special shot: name, speed, rgb (trail/glow), fx (flight twist in stepBall), hurt (receiver's line); draw = body painter
+  const CHARS = {
+    roo:     { name: "袋鼠", speed: 6.4, jump: 5.4, reach: 1.5, dive: 3.0, power: 1.0,  meter: 1.0, band: "#f6c453", tag: "平衡型",
+               sp: { name: "迴力鏢火球！", speed: 30, rgb: "255,150,50", fx: "curve", hurt: "好燙！" }, draw: (c) => bodyRoo(c) },
+    rabbit:  { name: "兔子", speed: 6.8, jump: 6.4, reach: 1.3, dive: 3.0, power: 0.92, meter: 1.0, band: "#ff8fb8", tag: "跳最高、手短",
+               sp: { name: "月亮跳跳球！", speed: 24, rgb: "255,150,200", fx: "hop", hurt: "彈去哪了！" }, draw: (c) => bodyRabbit(c) },
+    penguin: { name: "企鵝", speed: 5.5, jump: 4.2, reach: 1.7, dive: 3.8, power: 1.15, meter: 1.0, band: "#7fe0ff", tag: "慢但手長力大、飛撲遠",
+               sp: { name: "冰山滑球！", speed: 26, rgb: "170,230,255", fx: "wobble", hurt: "好滑！" }, draw: (c) => bodyPenguin(c) },
+    cheetah: { name: "獵豹", speed: 8.2, jump: 4.8, reach: 1.4, dive: 3.2, power: 0.95, meter: 1.0, band: "#ff6a2a", tag: "最快、跳得低",
+               sp: { name: "音速球！", speed: 42, rgb: "255,220,110", fx: "none", hurt: "看不見！" }, draw: (c) => bodyCheetah(c) },
+    seal:    { name: "海豹", speed: 6.0, jump: 4.4, reach: 1.5, dive: 3.0, power: 1.0,  meter: 1.0, band: "#7fe0ff", tag: "肚子滑行、冰旋球會凍住對手",
+               sp: { name: "冰旋球！", speed: 17, rgb: "150,230,255", fx: "wobble", hurt: "凍、凍住了", freeze: true }, draw: (c, b) => bodySeal(c, b) },
+    bear:    { name: "北極熊", speed: 5.4, jump: 4.0, reach: 1.75, dive: 2.8, power: 1.25, meter: 1.0, band: "#5aa9ff", tag: "最慢但力量最大、手最長",
+               sp: { name: "冰原重砲！", speed: 36, rgb: "200,235,255", fx: "none", hurt: "好、好重…", stun: 1.3 }, draw: (c) => bodyBear(c) },
+    zap:     { name: "電電鼠", speed: 7.0, jump: 5.4, reach: 1.3, dive: 3.0, power: 0.95, meter: 1.35, band: "#e8483b", tag: "快、集氣快、手短",
+               sp: { name: "電電衝擊！", speed: 30, rgb: "255,240,90", fx: "zigzag", hurt: "麻、麻痺了…", stun: 1.4 }, draw: (c) => bodyZap(c) },
+  };
+  // taunts: each character's own win/lose lines, mixed with lines for what just happened (ev)
+  const LINES = {
+    roo: [["袋鼠拳擊式勝利！", "跳跳跳～"], ["袋袋不服", "我要回澳洲"]],
+    rabbit: [["胡蘿蔔是我的！", "兔子跳～"], ["耳朵擋到視線了", "我要去挖洞"]],
+    penguin: [["冰上王者！", "企鵝不會飛但會贏"], ["腳太短了啦", "好冷…心更冷"]],
+    cheetah: [["太慢了！", "你看得到我嗎？"], ["我只是在暖身", "剛剛不算！"]],
+    seal: [["嗷嗷！拍拍拍！", "嗷嗚～"], ["嗷…", "我要回海裡"]],
+    bear: [["熊抱慶祝！", "北極熊最強"], ["冰山在融化…", "我只是餓了"]],
+    zap: [["電電電！", "電到你了吧"], ["電…電…", "沒電了"]],
+  };
+  const EV_LINES = {                                                     // [winner lines, loser lines]
+    net: [["謝謝網子～", "網子站我這邊"], ["網子好愛我…", "這網有毒"]],
+    out: [["出界囉～", "眼睛放亮點"], ["那是界內吧？！", "線審你過來"]],
+    miss: [["追不到吧～", "腿不夠長喔"], ["等等我！", "剛剛誰按暫停"]],
+    smashed: [["扣爆！", "殺！"], ["我的臉…", "剛剛那是什麼"]],
+    whiff: [["揮空了哈哈", "空氣好打嗎？"], ["揮、揮空…", "拍子有洞"]],
+  };
+  let charId = "roo";
+  try { const c = localStorage.getItem("roo-seal-char"); if (c && CHARS[c]) charId = c; } catch (e) {}
+  // opponent: oppPick is the menu choice ("random" or an id); oppId is resolved per match. The AI still drives the `seal` body.
+  let oppPick = "seal", oppId = "seal";
+  try { const c = localStorage.getItem("roo-seal-opp"); if (c && (c === "random" || CHARS[c])) oppPick = c; } catch (e) {}
+  const resolveOpp = () => { const ids = Object.keys(CHARS).filter((id) => id !== charId); oppId = oppPick === "random" ? pick(ids) : oppPick; };
+  const me = () => CHARS[charId], opp = () => CHARS[oppId];
+  const charOf = (side) => side === 0 ? me() : opp();
+  const nameOf = (side) => charOf(side).name;
+  function P(x, y, z = 0) {
+    const t = (y - Y0) / YSPAN, s = Math.max(0.05, 1 - FAR_SHRINK * t);   // floor: far-away objects must not get a negative size (canvas throws)
+    return { x: W / 2 + x * K * s, y: SCR_NEAR - t * (SCR_NEAR - SCR_FAR) - z * K * s, s };
+  }
+
+  const canvas = document.getElementById("c"), ctx = canvas.getContext("2d");
+  const overlay = document.getElementById("overlay"), ovTitle = document.getElementById("ov-title"),
+        ovText = document.getElementById("ov-text"), ovBtn = document.getElementById("ov-btn");
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let level = "normal";
+  try { const s = localStorage.getItem("roo-seal-level"); if (s && LEVELS[s]) level = s; } catch (e) {}
+  let soundOn = true;
+
+  // ---------- state
+  const makeBody = (side) => ({ side, x: 0, y: 0, vx: 0, vy: 0, face: 1, swing: 0, swingT: 0, swingCd: 0, shot: "drive",
+    meter: 0, armed: false, stun: 0, frozen: 0, bubble: "", bubbleT: 9, clap: 0, hop: 0, willMiss: false,
+    charging: false, chargeT: 0, diveT: 0, diveVx: 0, diveVy: 0, recover: 0, slide: 0, z: 0, vz: 0, swingAgo: 9, spinT: 0, netFace: 0 });
+  const roo = makeBody(0), seal = makeBody(1);
+  const ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, live: false, kind: "normal", t: 0, curve: 0, trail: [], netted: false, squash: 0, power: 0 };
+  const rings = [];                      // impact shockwaves (screen space)
+  const score = { pts: [0, 0], games: [0, 0], server: 0 };
+  let phase = "intro", pausedFrom = "serve";
+  let lastHitter = 0, bounces = 0, rally = 0, bestRally = 0, msg = "", msgT = 9, serveT = 0, tossT = -1, shake = 0, freeze = 0, flash = 0;
+  const keys = { left: false, right: false, up: false, down: false };
+  const particles = [];
+
+  const say = (b, t) => { b.bubble = t; b.bubbleT = 0; };
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ---------- sound
+  let actx = null;
+  function beep(freq, dur, type = "triangle", vol = 0.18, slide = 0) {
+    if (!soundOn) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+      o.type = type; o.frequency.setValueAtTime(freq, t); if (slide) o.frequency.exponentialRampToValueAtTime(freq * slide, t + dur);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g).connect(actx.destination); o.start(); o.stop(t + dur);
+    } catch (e) {}
+  }
+
+  // heavy racket hit: noise crack + low thump, both scaled by power (0..1)
+  let noiseBuf = null;
+  function thwack(power) {
+    if (!soundOn) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const t = actx.currentTime;
+      if (!noiseBuf) { noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.2, actx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3); }
+      const n = actx.createBufferSource(), hp = actx.createBiquadFilter(), ng = actx.createGain();
+      n.buffer = noiseBuf; hp.type = "bandpass"; hp.frequency.value = 1800 - power * 700; hp.Q.value = 0.8;
+      ng.gain.setValueAtTime(0.35 + power * 0.35, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.12 + power * 0.08);
+      n.connect(hp).connect(ng).connect(actx.destination); n.start(t);
+      const o = actx.createOscillator(), og = actx.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(170 - power * 60, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.18);
+      og.gain.setValueAtTime(0.45 + power * 0.4, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.2 + power * 0.1);
+      o.connect(og).connect(actx.destination); o.start(t); o.stop(t + 0.35);
+    } catch (e) {}
+  }
+
+  // ---------- particles (screen space)
+  function burst(sx, sy, n, color, speed = 160, life = 0.6, grav = 300) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = speed * (0.3 + Math.random());
+      particles.push({ x: sx, y: sy, vx: Math.cos(a) * s, vy: Math.sin(a) * s - speed * 0.3, life, max: life, color, grav, r: 2 + Math.random() * 3 });
+    }
+  }
+  // everything that makes a hit feel heavy: hit-stop, shake, shockwave, radial streaks, squash, sound
+  function impact(sx, sy, power, color = "#fff3c4") {
+    freeze = Math.max(freeze, 0.045 + power * 0.085);
+    shake = Math.max(shake, 0.12 + power * 0.35);
+    flash = Math.max(flash, power * 0.18);
+    rings.push({ x: sx, y: sy, r: 8, max: 60 + power * 90, life: 0.35, t: 0, color });
+    const n = 10 + Math.round(power * 16);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = 380 + Math.random() * 420 * (0.6 + power);
+      particles.push({ x: sx, y: sy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.18 + Math.random() * 0.12, max: 0.3, color, grav: 0, r: 2, streak: true });
+    }
+    ball.squash = 0.14; thwack(power);
+  }
+  function stepParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i]; p.life -= dt; if (p.life <= 0) { particles.splice(i, 1); continue; }
+      p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.streak) { p.vx *= 1 - dt * 6; p.vy *= 1 - dt * 6; }
+    }
+    for (let i = rings.length - 1; i >= 0; i--) { const r = rings[i]; r.t += dt; if (r.t >= r.life) rings.splice(i, 1); }
+  }
+
+  // ---------- rules
+  // deuce court (right, from the server's own view) on even point totals, ad court (left) on odd ones
+  const serveCourt = () => (score.pts[0] + score.pts[1]) % 2 === 0 ? "right" : "left";
+  // server's x: the near player faces +y so their right is +x; the far player faces -y so their right is -x. Receiver stands diagonal.
+  function serveX() { const r = serveCourt() === "right" ? 1.4 : -1.4; return score.server === 0 ? r : -r; }
+  function placeForServe() {
+    const srv = score.server, sx = serveX(), rx = -sx * 1.15;
+    Object.assign(roo, { x: srv === 0 ? sx : rx, y: srv === 0 ? -0.5 : 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
+    Object.assign(seal, { x: srv === 1 ? sx : rx, y: srv === 1 ? L + 0.5 : L - 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
+  }
+  function startServe() {
+    placeForServe(); phase = "serve"; serveT = 0; tossT = -1; ball.live = false; ball.kind = "normal"; ball.trail = []; ball.netted = false;
+    lastHitter = score.server; bounces = 0; rally = 0;
+  }
+  // ev: "net" | "out" | "miss" (what ended the point); turned into "smashed" / "whiff" when that is the funnier truth
+  function awardPoint(winner, why, ev = "miss") {
+    if (phase !== "rally") return;
+    phase = "point"; msg = why; msgT = 0;
+    if (ball.kind === "sp" && ball.owner === winner) msg = winner === 0 ? "必殺得分！" : charOf(1).sp.name.replace("！", "") + "得分";
+    const W_ = winner === 0 ? roo : seal, Lz = winner === 0 ? seal : roo;
+    if (ev === "miss" && ball.lastShot === "smash") ev = "smashed";
+    if (ev === "miss" && (Lz.swingAgo < 0.6 || Lz.willMiss)) ev = "whiff";
+    if (ev === "whiff") Lz.spinT = 0.9;                                    // blooper: spins around after swinging at air
+    if (ev === "net") Lz.netFace = 1.4;                                    // blooper: net stuck on the face
+    const own = (b, i) => LINES[b === roo ? charId : oppId][i];
+    say(W_, pick(Math.random() < 0.5 ? own(W_, 0) : EV_LINES[ev][0])); say(Lz, pick(Math.random() < 0.5 ? own(Lz, 1) : EV_LINES[ev][1]));
+    W_.clap = 1.2;
+    const p = score.pts; p[winner]++;
+    if (p[winner] >= 4 && p[winner] - p[1 - winner] >= 2) {
+      score.games[winner]++; score.pts = [0, 0]; score.server = 1 - score.server;
+      msg = nameOf(winner) + "拿下這一局";
+      if (score.games[winner] >= GAMES_TO_WIN) {
+        phase = "over";
+        setTimeout(() => showOverlay(winner === 0 ? me().name + "贏了！" : opp().name + "贏了…", `局數 ${score.games[0]} : ${score.games[1]}　最長連續 ${bestRally} 拍`, "再來一場"), 900);
+      }
+    }
+    beep(winner === 0 ? 660 : 220, 0.25, "sine", 0.2);
+  }
+  function pointLabel() {
+    const [a, b] = score.pts;
+    if (a >= 3 && b >= 3) return a === b ? "DEUCE" : (a > b ? "AD " + me().name : "AD " + opp().name);
+    return `${POINT_NAMES[Math.min(a, 3)]} - ${POINT_NAMES[Math.min(b, 3)]}`;
+  }
+
+  // ---------- shots: solve a flight that lands on (tx, ty) and clears the net
+  function launch(tx, ty, speed) {
+    const dist = Math.hypot(tx - ball.x, ty - ball.y);
+    let T = Math.max(0.45, dist / speed);
+    for (let i = 0; i < 30; i++) {
+      const vy = (ty - ball.y) / T, vz = (-ball.z + 0.5 * G * T * T) / T;
+      const tn = (NET_Y - ball.y) / vy;
+      const zn = tn > 0 && tn < T ? ball.z + vz * tn - 0.5 * G * tn * tn : 99;
+      if (zn > NET_H + 0.3) break;
+      T *= 1.07;
+    }
+    ball.vx = (tx - ball.x) / T; ball.vy = (ty - ball.y) / T; ball.vz = (-ball.z + 0.5 * G * T * T) / T;
+  }
+  // shot kinds: speed (m/s), depth (m from the far baseline), aimK (sideways spread), power (0..1 hit feel), label (big text)
+  const SHOTS = {
+    drive:  { speed: 21, depth: () => 3 + Math.random() * 2.5, aimK: 3.1, power: 0.25 },
+    lob:    { speed: 12, depth: () => 1.6, aimK: 3.1, power: 0.25 },
+    drop:   { speed: 11, depth: () => NET_Y - 2.6, aimK: 3.1, power: 0.25 },
+    volley: { speed: 24, depth: () => 4 + Math.random() * 3, aimK: 3.6, power: 0.45, label: "截擊！" },
+    smash:  { speed: 32, depth: () => 3 + Math.random() * 3, aimK: 3.4, power: 0.85, label: "扣殺！" },
+  };
+  // quality: "good" | "perfect" | "dive" (smash: "perfect" = hit at the top of the jump); charge: 0..1; aim: -1..1 left/right
+  function hitBall(b, shot, quality, aim, charge = 0) {
+    rally++; bestRally = Math.max(bestRally, rally);
+    const hp = P(ball.x, ball.y, ball.z);
+    // receiving a power shot: knocked back, weak floater
+    if (ball.kind === "sp" && ball.owner !== b.side) {
+      const sp = charOf(ball.owner).sp, col = `rgb(${sp.rgb})`;
+      if (sp.freeze) b.frozen = 0.9;                                      // ice specials freeze; the rest knock you back, dizzy
+      else { b.stun = sp.stun || 0.9; b.y = b.side === 1 ? Math.min(L + 2, b.y + 2.2) : Math.max(-2.8, b.y - 2.2); }
+      say(b, sp.hurt); burst(hp.x, hp.y, 30, col, 220, 0.6);
+      ball.kind = "normal"; ball.curve = 0; impact(hp.x, hp.y, 0.7, col);
+      launch((Math.random() - 0.5) * 2, b.side === 0 ? NET_Y + 3 : NET_Y - 3.5, 9);
+      lastHitter = b.side; bounces = 0; ball.netted = false; b.swing = 1; ball.power = 0;
+      return;
+    }
+    ball.kind = "normal"; ball.curve = 0; ball.spin = shot === "lob" ? "top" : shot === "drop" ? "slice" : "flat";
+    const S = SHOTS[shot];
+    let speed = S.speed, depth = S.depth(), power = S.power;
+    speed *= charOf(b.side).power;
+    if (S.label) { msg = S.label; msgT = 0; }
+    if (shot === "smash" && quality === "perfect") { speed = 36; power = 1; msg = "完美扣殺！"; freeze = 0.2; }
+    else if (quality === "perfect") { speed *= 1.18; power = Math.max(power, 0.6); if (!S.label) { msg = "NICE!"; msgT = 0; } }
+    if (quality === "dive") { speed *= 0.85; power = 0.45; }
+    if (charge > 0) { speed *= 1 + 0.38 * charge; power = Math.max(power, 0.35 + 0.6 * charge); if (charge >= 0.95) { msg = "MAX!"; msgT = 0; } }
+    let tx = clamp(aim * S.aimK + (Math.random() - 0.5) * 1.2, -HALF_W + 0.5, HALF_W - 0.5);
+    let ty = b.side === 0 ? L - depth : depth;
+    let color = charge >= 0.95 || shot === "smash" ? "#ffd65a" : "#fff3c4";
+    if (b.armed) {
+      b.armed = false; b.meter = 0; power = 1;
+      const sp = charOf(b.side).sp;                                       // kind "sp" + owner: whose special, flight twist in ball.fx
+      ball.kind = "sp"; ball.owner = b.side; ball.fx = sp.fx; speed = sp.speed; ty = b.side === 0 ? L - 2.5 : 2.5;
+      tx = clamp(aim * 3.3 || (Math.random() < 0.5 ? -3 : 3), -3.6, 3.6); if (sp.fx === "curve") ball.curve = -tx * 3.2;
+      msg = sp.name; color = `rgb(${sp.rgb})`; beep(sp.freeze ? 1200 : 180, 0.5, sp.freeze ? "sine" : "sawtooth", 0.18, sp.freeze ? 0.3 : 4);
+      msgT = 0; burst(hp.x, hp.y, 40, color, 260, 0.7, 120);
+    } else if (b.side === 0) {
+      b.meter = Math.min(1, b.meter + ((quality === "perfect" ? 0.3 : 0.2) + (charge >= 0.95 ? 0.15 : 0)) * me().meter);
+      if (b.meter >= 1) { b.armed = true; say(b, "必殺準備！"); beep(880, 0.2, "sawtooth", 0.1, 1.5); }   // full meter: the next hit is the special, automatically
+    } else {
+      b.meter = Math.min(1, b.meter + LEVELS[level].meter * opp().meter); power = 0.2;
+    }
+    if (b.side === 0 && ball.kind === "normal" && Math.abs(b.vx) > 1) ball.curve = b.vx * 0.6;   // running sidespin
+    launch(tx, ty, speed);
+    if (ball.curve) ball.vx -= ball.curve * (Math.abs(ball.vy) > 0 ? (ty - ball.y) / ball.vy : 1) / 2;   // curve still lands on target
+    lastHitter = b.side; bounces = 0; ball.netted = false; ball.t = 0; ball.power = power; ball.lastShot = shot;
+    b.swing = 1; b.swingT = 0; b.charging = false; b.chargeT = 0;
+    impact(hp.x, hp.y, power, color);
+  }
+  const tossZ = (t) => 1.2 + TOSS_V * t - 0.5 * G * t * t;
+  // bounce by spin: kz = vertical rebound, kxy = horizontal speed kept. Shared by stepBall and predict so the yellow
+  // landing ring / AI never lie about where the ball goes after the bounce.
+  const BOUNCE = { flat: { kz: 0.68, kxy: 0.85 }, top: { kz: 0.9, kxy: 0.97 }, slice: { kz: 0.4, kxy: 0.95 } };
+  const SPIN_RGB = { flat: "222,245,90", top: "255,150,90", slice: "150,205,255" };
+  // quality: "perfect" | "good" | "weak" (kangaroo: how close to the toss apex; seal: random); aim -1..1 = wide / body / T
+  function doServe(quality, aim, spin = "flat") {
+    const b = score.server === 0 ? roo : seal, dir = score.server === 0 ? 1 : -1;
+    ball.x = b.x + 0.4 * dir; ball.y = b.y + 0.3 * dir; ball.z = tossT >= 0 ? tossZ(tossT) : 2.4; ball.live = true; ball.kind = "normal"; ball.trail = [];
+    phase = "rally"; rally = 0; lastHitter = score.server; tossT = -1;
+    const Q = { perfect: [26, 0.8, "完美發球！"], good: [20, 0.35, ""], weak: [13, 0.15, "軟軟的發球…"] }[quality];
+    launch(-Math.sign(b.x || 1) * 2.1 + aim * 1.4 * dir, NET_Y + dir * (SERVICE - 1.2), Q[0]);
+    bounces = 0; ball.netted = false; b.swing = 1; rally = 1; ball.power = Q[1];
+    ball.spin = spin; ball.curve = 0;
+    if (Q[2]) { msg = Q[2]; msgT = 0; } else if (spin !== "flat") { msg = spin === "top" ? "上旋發球！" : "切球發球！"; msgT = 0; }
+    const sp = P(ball.x, ball.y, ball.z); impact(sp.x, sp.y, Q[1]);
+  }
+
+  // ---------- ball physics
+  function stepBall(dt) {
+    if (phase !== "rally" && (ball.y < -12 || ball.y > L + 12 || Math.abs(ball.x) > 14)) { ball.live = false; return; }   // dead ball rolled away
+    const py = ball.y;
+    ball.t += dt;
+    if (ball.kind === "sp" && ball.fx === "wobble") ball.x += Math.sin(ball.t * 9) * 3.5 * dt;                          // wobble
+    if (ball.kind === "sp" && ball.fx === "zigzag") ball.x += Math.sign(Math.sin(ball.t * 16)) * 5 * dt;               // lightning zigzag
+    ball.vx += ball.curve * dt;
+    ball.x += ball.vx * dt; ball.y += ball.vy * dt; ball.vz -= G * dt; ball.z += ball.vz * dt;
+    const sp = P(ball.x, ball.y, ball.z);
+    ball.trail.push(sp); if (ball.trail.length > (ball.kind === "normal" ? 8 : 16)) ball.trail.shift();
+    if (ball.kind === "sp" && Math.random() < 0.9) particles.push({ x: sp.x, y: sp.y, vx: (Math.random() - 0.5) * 60, vy: -20 - Math.random() * 40, life: 0.4, max: 0.4, color: Math.random() < 0.5 ? `rgb(${charOf(ball.owner).sp.rgb})` : "#ffffff", grav: -60, r: 2 + Math.random() * 3 * sp.s });
+    // net
+    if (!ball.netted && (py - NET_Y) * (ball.y - NET_Y) <= 0 && ball.z < NET_H) {
+      ball.netted = true; ball.y = NET_Y - Math.sign(ball.vy) * 0.08; ball.vy *= -0.15; ball.vx *= 0.2;
+      msg = "掛網…"; msgT = 0; beep(160, 0.08, "square", 0.08);
+    }
+    // bounce
+    if (ball.z <= 0 && ball.vz < 0) {
+      const bo = BOUNCE[ball.spin || "flat"];
+      ball.z = 0; ball.vz = -ball.vz * bo.kz; ball.vx *= bo.kxy; ball.vy *= bo.kxy;
+      if (ball.kind === "sp" && ball.fx === "hop") { ball.vz *= 1.5; ball.vx += (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 3); }   // bounces off sideways
+      beep(300, 0.05, "sine", 0.1); const bp = P(ball.x, ball.y); burst(bp.x, bp.y, 5, "rgba(230,240,255,.8)", 60 * bp.s, 0.3);
+      const side = ball.y < NET_Y ? 0 : 1;
+      const out = Math.abs(ball.x) > HALF_W + 0.08 || ball.y < -0.05 || ball.y > L + 0.05;
+      if (side === lastHitter) awardPoint(1 - lastHitter, lastHitter === 0 ? "沒過網" : opp().name + "沒過網", "net");
+      else if (bounces === 0 && out) awardPoint(1 - lastHitter, "出界！", "out");
+      else if (++bounces >= 2) awardPoint(lastHitter, lastHitter === 0 ? opp().name + "沒接到！" : "沒接到…");
+    }
+    if (ball.y < -9 || ball.y > L + 9 || Math.abs(ball.x) > 13) {
+      if (bounces === 0) awardPoint(1 - lastHitter, "出界！", "out"); else awardPoint(lastHitter, "沒接到");
+    }
+    if (phase !== "rally") return;                                        // ball keeps rolling after a point, but nobody hits it
+    // kangaroo: hits during a swing, a charged swing (auto-releases in reach) or a dive
+    if ((roo.swingT > 0 || roo.charging || roo.diveT > 0) && lastHitter === 1 && ball.y < NET_Y + 0.5) {
+      const d = Math.hypot(ball.x - roo.x, ball.y - roo.y), reach = me().reach * (roo.diveT > 0 ? 1.25 : roo.z > 0.15 ? SMASH_REACH : 1);
+      if (d < reach && inReachZ()) {
+        const aim = keys.left ? -1 : keys.right ? 1 : 0, vert = keys.up ? 1 : keys.down ? -1 : 0;
+        const charge = roo.charging ? Math.min(1, roo.chargeT / 0.9) : 0;
+        const smash = roo.z > 0.15 && ball.z > 1.8;
+        const shot = smash ? "smash" : vert > 0 ? "lob" : vert < 0 ? "drop" : bounces === 0 ? "volley" : "drive";
+        const q = smash ? (Math.abs(roo.vz) < 1.6 ? "perfect" : "good") : roo.diveT > 0 ? "dive" : d < PERFECT_D ? "perfect" : "good";
+        hitBall(roo, shot, q, aim, charge);
+      }
+    }
+    // seal: swings automatically when in reach (unless it decided to whiff this one)
+    if (lastHitter === 0 && ball.y > NET_Y - 0.5 && seal.stun <= 0) {
+      const d = Math.hypot(ball.x - seal.x, ball.y - seal.y);
+      if (d < opp().reach * 0.95 && ball.z < REACH_Z && !seal.willMiss) {
+        const lob = Math.random() < 0.22;
+        hitBall(seal, lob ? "lob" : "drive", "good", roo.x > 0 ? (Math.random() < 0.7 ? -1 : 1) : (Math.random() < 0.7 ? 1 : -1));
+      }
+    }
+  }
+
+  // predict where the ball can be taken on a side: first spot after the bounce at a comfortable height
+  function predict(side) {
+    let x = ball.x, y = ball.y, z = ball.z, vx = ball.vx, vy = ball.vy, vz = ball.vz, b = 0, land = null;
+    for (let i = 0; i < 400; i++) {
+      const dt = 1 / 100; vx += ball.curve * dt; x += vx * dt; y += vy * dt; vz -= G * dt; z += vz * dt;
+      if (z <= 0 && vz < 0) { const bo = BOUNCE[ball.spin || "flat"]; z = 0; vz = -vz * bo.kz; vx *= bo.kxy; vy *= bo.kxy; b++; if (!land) land = { x, y }; if (b >= 2) break; }
+      const mine = side === 0 ? y < NET_Y : y > NET_Y;
+      if (mine && b === 1 && vz < 0 && z < 1.3) return { x, y, land };
+    }
+    return { x, y, land };
+  }
+
+  // ---------- movement
+  function moveBody(b, ix, iy, speed, dt) {
+    if (b.frozen > 0) { b.frozen -= dt; ix = iy = 0; }
+    if (b.stun > 0) { b.stun -= dt; ix = iy = 0; }
+    const len = Math.hypot(ix, iy) || 1;
+    b.vx = ix / len * speed * Math.min(1, Math.hypot(ix, iy)); b.vy = iy / len * speed * Math.min(1, Math.hypot(ix, iy));
+    b.x = clamp(b.x + b.vx * dt, -6.2, 6.2);
+    b.y = b.side === 0 ? clamp(b.y + b.vy * dt, -2.8, NET_Y - 1) : clamp(b.y + b.vy * dt, NET_Y + 1, L + 2);
+    b.hop = Math.hypot(b.vx, b.vy) > 0.5 ? b.hop + dt * 13 : 0;
+    b.swing = Math.max(0, b.swing - dt * 4); b.swingT = Math.max(0, b.swingT - dt); b.swingCd = Math.max(0, b.swingCd - dt);
+    b.clap = Math.max(0, b.clap - dt); b.bubbleT += dt; b.swingAgo += dt;
+    b.spinT = Math.max(0, b.spinT - dt); b.netFace = Math.max(0, b.netFace - dt);
+    if (ball.live) b.face = ball.x >= b.x ? 1 : -1;
+  }
+  let sealTarget = null, sealDecided = false;
+  function stepSeal(dt) {
+    const Lv = LEVELS[level];
+    let tx = 0, ty = L - 1;
+    if (phase === "rally" && lastHitter === 0 && !ball.netted) {
+      if (!sealDecided) { sealDecided = true; seal.willMiss = Math.random() < Lv.miss; sealTarget = predict(1); sealTarget.x += (Math.random() - 0.5) * Lv.err; }
+      tx = sealTarget.x - 0.35; ty = sealTarget.y + 0.5;
+    } else { sealDecided = false; seal.willMiss = false; }
+    // belly slide: a far ball gets a burst of speed (and a very undignified pose)
+    const far = Math.hypot(tx - seal.x, ty - seal.y);
+    if (oppId === "seal" && phase === "rally" && lastHitter === 0 && far > 2.2 && seal.slide <= 0 && seal.stun <= 0 && Math.random() < dt * 3) { seal.slide = 0.55; say(seal, "滑～"); }
+    seal.slide = Math.max(0, seal.slide - dt);
+    moveBody(seal, clamp(tx - seal.x, -1, 1) * (Math.abs(tx - seal.x) > 0.1), clamp(ty - seal.y, -1, 1) * (Math.abs(ty - seal.y) > 0.15), Lv.speed * opp().speed / CHARS.seal.speed * (seal.slide > 0 ? 1.7 : 1), dt);
+    if (seal.meter >= 1 && !seal.armed && phase === "rally" && lastHitter === 0 && Math.random() < dt * 0.8) { seal.armed = true; say(seal, "看我的" + opp().sp.name.replace("！", "")); }
+  }
+  function stepRoo(dt) {
+    if (roo.diveT > 0) {                                                  // mid-dive: flying toward the ball
+      roo.diveT -= dt; roo.x = clamp(roo.x + roo.diveVx * dt, -6.2, 6.2); roo.y = clamp(roo.y + roo.diveVy * dt, -2.8, NET_Y - 1);
+      if (roo.diveT <= 0) { roo.recover = 0.55; const p = P(roo.x, roo.y); burst(p.x, p.y, 12, "rgba(200,215,240,.8)", 120, 0.4, 150); }
+      roo.swing = Math.max(0, roo.swing - dt * 3); roo.bubbleT += dt; return;
+    }
+    if (roo.recover > 0) { roo.recover -= dt; moveBody(roo, 0, 0, 0, dt); return; }
+    if (roo.charging) {
+      roo.chargeT += dt;
+      if (lastHitter !== 1 || phase !== "rally" || bounces >= 2) { roo.charging = false; roo.chargeT = 0; }
+      if (roo.chargeT > 0.9 && roo.chargeT - dt <= 0.9) beep(1320, 0.12, "triangle", 0.08);
+    }
+    if (roo.z > 0) {                                                      // airborne: keeps take-off velocity, no steering
+      roo.vz -= G * dt; roo.z += roo.vz * dt;
+      roo.x = clamp(roo.x + roo.vx * dt, -6.2, 6.2); roo.y = clamp(roo.y + roo.vy * dt, -2.8, NET_Y - 1);
+      roo.swing = Math.max(0, roo.swing - dt * 4); roo.swingT = Math.max(0, roo.swingT - dt); roo.swingCd = Math.max(0, roo.swingCd - dt); roo.bubbleT += dt;
+      if (roo.z <= 0) { roo.z = 0; roo.vz = 0; const p = P(roo.x, roo.y); burst(p.x, p.y, 8, "rgba(200,215,240,.8)", 90, 0.35, 150); beep(140, 0.08, "sine", 0.12); }
+      return;
+    }
+    const ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), iy = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
+    moveBody(roo, ix, iy, me().speed * (roo.charging ? 0.47 : 1), dt);                  // charging slows you down: commit early or keep running
+  }
+
+  // ---------- input actions
+  function swing() {
+    if (phase === "intro" || phase === "over") { startMatch(); return; }
+    if (phase === "paused") { togglePause(); return; }
+    if (phase === "point") { msgT = Math.max(msgT, 1.5); return; }        // skip the blooper / taunt pause
+    if (phase === "serve") {                                              // 1st press tosses, 2nd press hits: timing = serve quality
+      if (score.server !== 0) return;
+      if (tossT < 0) { tossT = 0; beep(600, 0.08, "sine", 0.06, 1.4); return; }
+      const off = Math.abs(tossT - TOSS_V / G);
+      doServe(off < APEX_OK ? "perfect" : off < 0.22 ? "good" : "weak", keys.left ? -1 : keys.right ? 1 : 0, keys.up ? "top" : keys.down ? "slice" : "flat"); return;
+    }
+    if (phase !== "rally" || roo.swingCd > 0 || roo.frozen > 0 || roo.stun > 0 || roo.diveT > 0 || roo.recover > 0) return;
+    const incoming = lastHitter === 1 && !ball.netted && bounces < 2;
+    const d = Math.hypot(ball.x - roo.x, ball.y - roo.y);
+    roo.swing = 1; roo.swingAgo = 0;
+    if (roo.z > 0) {                                                      // mid-air: racket stays ready until landing, auto-hits a ball in reach
+      roo.swingT = (roo.vz + Math.sqrt(roo.vz * roo.vz + 2 * G * roo.z)) / G + 0.05; roo.swingCd = 0.3; return;
+    }
+    if (incoming && d < me().reach && inReachZ()) { roo.swingT = 0.2; roo.swingCd = 0.35; }                   // in reach: swing now
+    else if (incoming && ball.y < NET_Y && d < me().dive && ball.z < 2.2 && (ball.vy < 0 || bounces === 1)) {    // just out of reach: dive
+      const k = 1 / 0.26; roo.diveT = 0.26; roo.diveVx = (ball.x - roo.x) * k * 0.8; roo.diveVy = (ball.y - roo.y) * k * 0.8;
+      roo.swingCd = 0.8; say(roo, "飛撲！"); beep(330, 0.15, "sawtooth", 0.08, 1.8);
+    } else if (incoming) { roo.charging = true; roo.chargeT = 0; roo.swing = 0.3; beep(520, 0.08, "sine", 0.06, 1.5); }  // early: charge up
+    else { roo.swingT = 0.2; roo.swingCd = 0.35; }
+  }
+  function jump() {
+    if (phase === "intro" || phase === "over") { startMatch(); return; }
+    if (phase !== "rally" || roo.z > 0 || roo.diveT > 0 || roo.recover > 0 || roo.frozen > 0 || roo.stun > 0) return;
+    roo.vz = me().jump; roo.z = 0.001; beep(420, 0.12, "sine", 0.08, 1.6);
+    const p = P(roo.x, roo.y); burst(p.x, p.y, 6, "rgba(200,215,240,.8)", 80, 0.3, 150);
+  }
+  // ball height the kangaroo can reach: standing REACH_Z, jumping adds its height (with a longer arm overhead)
+  const inReachZ = () => ball.z < REACH_Z + roo.z * 1.6 && ball.z > roo.z - 0.3;
+  // smash spot: the LAST point on the kangaroo's side, before the bounce, where the falling ball is still at SMASH_Z or higher —
+  // the deepest one, nearest the baseline where the player waits (the first such point sits at the service line: unreachable in time).
+  // t = seconds from now. Jump cue fires when t matches the time to the top of a jump.
+  const SMASH_Z = 2.4;
+  function smashSpot() {
+    if (phase !== "rally" || lastHitter !== 1 || ball.netted || bounces > 0) return null;
+    let x = ball.x, y = ball.y, z = ball.z, vx = ball.vx, vy = ball.vy, vz = ball.vz, spot = null;
+    for (let t = 0; t < 3; t += 0.01) {
+      vx += ball.curve * 0.01; x += vx * 0.01; y += vy * 0.01; vz -= G * 0.01; z += vz * 0.01;
+      if (z < SMASH_Z && vz < 0) return spot;
+      if (y < NET_Y - 1 && vz < 0 && z < REACH_Z + 1.6) spot = { x, y, z, t };
+    }
+    return spot;
+  }
+  // "high ball": a jump would turn it into a smash
+  const highBall = () => phase === "rally" && lastHitter === 1 && !ball.netted && ball.y < NET_Y && ball.z > REACH_Z - 0.3;
+
+  // ---------- drawing
+  function poly(pts, fill, stroke) { ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); } }
+  function line(x1, y1, x2, y2) { const a = P(x1, y1), b = P(x2, y2); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+  function drawCourt() {
+    const sky = ctx.createLinearGradient(0, 0, 0, 110);
+    sky.addColorStop(0, "#1d2550"); sky.addColorStop(1, "#b25f63");
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 110);
+    ctx.fillStyle = "#2a2146"; ctx.fillRect(0, 60, W, 50);
+    const cheer = phase === "rally" && rally >= 6, t = performance.now() / 1000;
+    for (let x = 10; x < W; x += 18) { const jy = cheer ? Math.abs(Math.sin(t * 9 + x)) * 4 : 0; ctx.fillStyle = x % 36 ? "#4a3d78" : "#3a2f5e"; ctx.beginPath(); ctx.arc(x, 76 + (x % 3) * 5 - jy, 5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = "#24569a"; ctx.fillRect(0, 100, W, H - 100);
+    const icy = ball.live && ball.kind === "sp" && ball.owner === 1 && opp().sp.freeze;
+    poly([P(-DOUBLES_HALF - 1.5, -3.2), P(DOUBLES_HALF + 1.5, -3.2), P(DOUBLES_HALF + 1.5, L + 3.2), P(-DOUBLES_HALF - 1.5, L + 3.2)], "#2a62a6");
+    poly([P(-DOUBLES_HALF, 0), P(DOUBLES_HALF, 0), P(DOUBLES_HALF, L), P(-DOUBLES_HALF, L)], "#2f6fb3");
+    if (icy) poly([P(-DOUBLES_HALF, 0), P(DOUBLES_HALF, 0), P(DOUBLES_HALF, NET_Y), P(-DOUBLES_HALF, NET_Y)], "rgba(200,240,255,.3)");
+    ctx.strokeStyle = "#eef3fb"; ctx.lineWidth = 2.5;
+    poly([P(-DOUBLES_HALF, 0), P(DOUBLES_HALF, 0), P(DOUBLES_HALF, L), P(-DOUBLES_HALF, L)], null, "#eef3fb");
+    line(-HALF_W, 0, -HALF_W, L); line(HALF_W, 0, HALF_W, L);
+    line(-HALF_W, NET_Y - SERVICE, HALF_W, NET_Y - SERVICE); line(-HALF_W, NET_Y + SERVICE, HALF_W, NET_Y + SERVICE);
+    line(0, NET_Y - SERVICE, 0, NET_Y + SERVICE); line(0, 0, 0, 0.3); line(0, L, 0, L - 0.3);
+    if (phase === "serve") {                                              // the diagonal service box to aim at glows
+      const far = score.server === 0, bx = -Math.sign(serveX()) * HALF_W, y0 = NET_Y, y1 = far ? NET_Y + SERVICE : NET_Y - SERVICE;
+      const a = 0.16 + Math.sin(performance.now() / 200) * 0.06;
+      poly([P(0, y0), P(bx, y0), P(bx, y1), P(0, y1)], `rgba(255,214,90,${a})`);
+    }
+  }
+  function drawNet() {
+    const a = P(-DOUBLES_HALF - 0.4, NET_Y), b = P(DOUBLES_HALF + 0.4, NET_Y), at = P(-DOUBLES_HALF - 0.4, NET_Y, NET_H), bt = P(DOUBLES_HALF + 0.4, NET_Y, NET_H);
+    poly([a, b, bt, at], "rgba(15,18,34,.55)");
+    ctx.strokeStyle = "rgba(238,243,251,.25)"; ctx.lineWidth = 1;
+    for (let x = -DOUBLES_HALF; x <= DOUBLES_HALF; x += 0.5) { const p = P(x, NET_Y), q = P(x, NET_Y, NET_H); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke(); }
+    ctx.strokeStyle = "#f3f6fb"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(at.x, at.y); ctx.lineTo(bt.x, bt.y); ctx.stroke();
+    ctx.fillStyle = "#1a1d33"; [a, b].forEach((p, i) => { const t = i ? bt : at; ctx.fillRect(p.x - 3, t.y - 4, 6, p.y - t.y + 4); });
+  }
+
+  function shadow(x, y, r, color = "rgba(10,14,40,.35)") { const p = P(x, y); ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(p.x, p.y + 2, r * p.s, r * 0.28 * p.s, 0, 0, Math.PI * 2); ctx.fill(); }
+  function drawRacket(b, frame, handShade) {
+    const hand = { x: 44, y: -84 };
+    ctx.save(); ctx.translate(hand.x, hand.y); ctx.rotate(-0.55 + b.swing * 1.5 - (b.clap > 0 ? Math.abs(Math.sin(b.clap * 14)) * 0.8 : 0));
+    ctx.strokeStyle = "#1c1c1c"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(14, -6); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,.18)"; ctx.strokeStyle = frame; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.ellipse(32, -14, 20, 14, -0.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.45)"; ctx.lineWidth = 1;
+    for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(32 + k * 6, -26); ctx.lineTo(32 + k * 6, -2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(14, -14 + k * 5); ctx.lineTo(50, -14 + k * 5); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = handShade; ctx.beginPath(); ctx.arc(hand.x, hand.y, 5, 0, Math.PI * 2); ctx.fill();
+  }
+  function glow(b, color) {
+    if (!b.armed) return;
+    const t = performance.now() / 1000, r = 72 + Math.sin(t * 8) * 6;
+    const g = ctx.createRadialGradient(10, -70, 10, 10, -70, r); g.addColorStop(0, color); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(10, -70, r, 0, Math.PI * 2); ctx.fill();
+  }
+  function drawPlayer(b) {
+    const ch = charOf(b.side), clapBob = b.clap > 0 ? Math.abs(Math.sin(b.clap * 14)) * 8 * CHAR : 0;
+    const spot = smashSpot(), g0 = P(b.x, b.y), p = P(b.x, b.y, b.z), s = p.s * 0.95 * CHAR, bob = b.hop && !b.z ? Math.abs(Math.sin(b.hop)) * 9 * CHAR : 0;
+    shadow(b.x, b.y, 0.9 * CHAR);
+    // reach ring: lights up when the ball can be hit
+    if (b.side === 0 && phase === "rally" && lastHitter === 1 && ball.y < NET_Y) {
+      const d = Math.hypot(ball.x - b.x, ball.y - b.y), ok = d < me().reach && inReachZ();
+      ctx.strokeStyle = ok ? "rgba(255,214,90,.95)" : "rgba(255,255,255,.18)"; ctx.lineWidth = ok ? 3 : 1.5;
+      ctx.beginPath(); ctx.ellipse(g0.x, g0.y + 2, me().reach * K * g0.s, me().reach * K * g0.s * 0.28, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.font = '400 16px "Bungee", "Noto Sans TC", sans-serif'; ctx.textAlign = "center";
+      if (ok) { ctx.fillStyle = "#ffd65a"; ctx.fillText(b.z > 0 && ball.z > 2 ? "SMASH!" : "HIT!", p.x, p.y - 190 * s); }
+      else if (!b.z && spot && Math.hypot(spot.x - b.x, spot.y - b.y) < me().reach * SMASH_REACH && Math.abs(spot.t - me().jump / G) < 0.15) {
+        ctx.fillStyle = "#ff7a5a"; ctx.fillText("跳！", p.x, p.y - 190 * s);
+      }
+    }
+    if (b.charging) {                                                  // charge aura grows until MAX
+      const c = Math.min(1, b.chargeT / 0.9), t = performance.now() / 1000, full = c >= 1;
+      const g = ctx.createRadialGradient(p.x, p.y - 70 * s, 6, p.x, p.y - 70 * s, (50 + 50 * c) * s);
+      g.addColorStop(0, full ? "rgba(255,230,120,.75)" : `rgba(255,200,90,${0.2 + 0.4 * c})`); g.addColorStop(1, "rgba(255,160,40,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y - 70 * s, (50 + 50 * c) * s, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = full ? "#ffd65a" : "rgba(255,214,90,.6)"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(p.x, p.y - 190 * s, 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * c); ctx.stroke();
+      if (full) { ctx.font = '400 13px "Bungee", sans-serif'; ctx.fillStyle = "#ffd65a"; ctx.textAlign = "center"; ctx.fillText("MAX", p.x, p.y - 212 * s - Math.abs(Math.sin(t * 10)) * 3); }
+    }
+    ctx.save(); ctx.translate(p.x, p.y - bob - clapBob); ctx.scale(s * b.face, s); glow(b, `rgba(${ch.sp.rgb},.55)`);
+    if (b.slide > 0) {                                                     // seal belly slide
+      ctx.rotate(1.2);
+      if (Math.random() < 0.5) particles.push({ x: g0.x, y: g0.y, vx: (Math.random() - 0.5) * 80, vy: -40 - Math.random() * 40, life: 0.35, max: 0.35, color: "rgba(220,235,255,.8)", grav: 200, r: 2 });
+    }
+    if (b.diveT > 0) { ctx.translate(0, -30); ctx.rotate(1.1); }            // flying dive
+    else if (b.recover > 0) { ctx.translate(0, 8); ctx.rotate(1.35); }       // flat on the court
+    if (b.spinT > 0) { ctx.translate(0, -70); ctx.rotate(b.spinT * 14); ctx.translate(0, 70); }   // whiff spin
+    const shade = ch.draw(ch, b);
+    if (b.netFace > 0) {                                                   // net wrapped around the head
+      ctx.strokeStyle = "rgba(240,244,250,.85)"; ctx.lineWidth = 1.5;
+      for (let k = 0; k <= 6; k++) { ctx.beginPath(); ctx.moveTo(-6 + k * 10, -158); ctx.lineTo(-6 + k * 10, -92); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-8, -158 + k * 11); ctx.lineTo(56, -158 + k * 11); ctx.stroke(); }
+    }
+    ctx.strokeStyle = shade; ctx.lineWidth = 7; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(30, -94); ctx.lineTo(44, -84); ctx.stroke();
+    if (b.swing > 0.35) {                                              // racket smear
+      ctx.save(); ctx.translate(44, -84); ctx.strokeStyle = `rgba(255,255,255,${(b.swing - 0.35) * 0.9})`; ctx.lineWidth = 16; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.arc(0, 0, 36, -0.55 - 0.4, -0.55 + b.swing * 1.5 - 0.4, false); ctx.stroke(); ctx.restore();
+    }
+    drawRacket(b, b.armed ? `rgb(${ch.sp.rgb})` : b.charging ? "#ffd65a" : ch.band, shade);
+    if (b.frozen > 0) { ctx.fillStyle = "rgba(190,240,255,.55)"; ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.rect(-60, -178, 140, 182); ctx.fill(); ctx.stroke(); }
+    ctx.restore();
+    if (b.stun > 0) {                                                      // dizzy stars
+      const t = performance.now() / 180; ctx.fillStyle = "#ffe066"; ctx.font = '700 14px "Noto Sans TC", sans-serif'; ctx.textAlign = "center";
+      for (let i = 0; i < 3; i++) { const a = t + i * 2.1; ctx.fillText("★", p.x + Math.cos(a) * 24 * s, p.y - 150 * s + Math.sin(a) * 6); }
+    }
+  }
+  // ---------- character bodies: local space, facing right, feet at y=0, racket hand at (44, -84); each returns its shade colour
+  function E(c, x, y, rx, ry, a = 0) { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, a, 0, Math.PI * 2); ctx.fill(); }
+  function eye(x, y, r = 3) { E("#1f1a18", x, y, r, r); E("#fff", x + r * 0.35, y - r * 0.35, r * 0.35, r * 0.35); }
+  function bodyRoo(c) {
+    const fur = "#c0652e", shade = "#8e4620";
+    ctx.fillStyle = shade; ctx.beginPath(); ctx.moveTo(-14, -34); ctx.bezierCurveTo(-44, -30, -70, -14, -96, -2); ctx.bezierCurveTo(-70, 0, -36, -8, -8, -16); ctx.fill();
+    ctx.fillStyle = fur; ctx.beginPath(); ctx.moveTo(-22, -20); ctx.bezierCurveTo(-36, -62, -16, -104, 16, -118); ctx.bezierCurveTo(36, -126, 50, -110, 46, -86); ctx.bezierCurveTo(42, -58, 30, -30, 8, -14); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-8, -34, 32, 25, -0.32, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-16, -8); ctx.lineTo(40, -2); ctx.quadraticCurveTo(46, 2, 40, 4); ctx.lineTo(-18, 2); ctx.fill();
+    ctx.strokeStyle = shade; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-34, -24); ctx.bezierCurveTo(-26, -46, -2, -52, 18, -44); ctx.stroke();
+    ctx.fillStyle = "#ecd2ad"; ctx.beginPath(); ctx.ellipse(32, -70, 9, 28, 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = fur; ctx.beginPath(); ctx.moveTo(22, -110); ctx.bezierCurveTo(26, -126, 34, -134, 44, -136); ctx.lineTo(50, -120); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(44, -134, 15, 11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(52, -140); ctx.bezierCurveTo(66, -138, 74, -132, 72, -126); ctx.bezierCurveTo(66, -122, 58, -123, 50, -126); ctx.fill();
+    ctx.fillStyle = "#2c170e"; ctx.beginPath(); ctx.ellipse(72, -129, 3.2, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(49, -138, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(49.8, -138.8, 0.8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = shade; ctx.beginPath(); ctx.moveTo(34, -142); ctx.bezierCurveTo(28, -160, 32, -170, 38, -168); ctx.bezierCurveTo(42, -160, 42, -150, 40, -142); ctx.fill();
+    ctx.fillStyle = fur; ctx.beginPath(); ctx.moveTo(40, -144); ctx.bezierCurveTo(38, -162, 44, -172, 50, -168); ctx.bezierCurveTo(52, -160, 50, -150, 46, -142); ctx.fill();
+    ctx.fillStyle = "#f6c453"; ctx.fillRect(30, -146, 26, 5);
+    return shade;
+  }
+  function bodyRabbit(c) {
+    const fur = "#eeeae2", shade = "#b9b2a6";
+    E(shade, 8, -4, 24, 7); E("#fff", -28, -40, 11, 11);
+    E(fur, 0, -52, 28, 42, 0.1); E("#fff", 12, -50, 14, 28, 0.1);
+    E(fur, 12, -156, 7, 28, -0.15); E("#f3b6c2", 12, -154, 3.5, 20, -0.15);
+    E(fur, 30, -158, 7, 28, 0.15); E("#f3b6c2", 30, -156, 3.5, 20, 0.15);
+    E(fur, 22, -112, 25, 22); eye(34, -116); E("#f08aa0", 46, -108, 3, 2.5);
+    ctx.fillStyle = c.band; ctx.fillRect(2, -134, 42, 5);
+    return shade;
+  }
+  function bodyPenguin(c) {
+    const dark = "#1d2233", shade = "#141826";
+    E("#f0922e", 6, -3, 22, 6); E(shade, -24, -70, 8, 28, 0.3);
+    E(dark, 0, -64, 34, 64); E("#f4f4f0", 12, -58, 21, 48, 0.08);
+    E(dark, 10, -124, 25, 22); E("#f4f4f0", 22, -120, 12, 12); eye(27, -124);
+    ctx.fillStyle = "#f0922e"; ctx.beginPath(); ctx.moveTo(32, -120); ctx.lineTo(50, -114); ctx.lineTo(32, -109); ctx.fill();
+    ctx.fillStyle = c.band; ctx.fillRect(-12, -144, 40, 5);
+    return "#2c3348";
+  }
+  function bodyCheetah(c) {
+    const fur = "#e8b04a", shade = "#b07a26";
+    ctx.strokeStyle = fur; ctx.lineWidth = 8; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-18, -34); ctx.quadraticCurveTo(-60, -30, -74, -6); ctx.stroke();
+    ctx.strokeStyle = "#2a1e12"; ctx.beginPath(); ctx.moveTo(-72, -10); ctx.lineTo(-75, -3); ctx.stroke();
+    E(shade, -6, -5, 13, 6); E(fur, 14, -5, 13, 6);
+    E(fur, 0, -56, 26, 42, 0.1); E("#f7e7c0", 12, -54, 12, 28, 0.1);
+    [[-12, -70], [-4, -40], [-16, -48], [2, -84], [-8, -24], [-20, -62]].forEach(([x, y]) => E("#3a2a18", x, y, 3.2, 2.8));
+    E(fur, 10, -130, 7, 8); E(fur, 30, -132, 7, 8);
+    E(fur, 22, -112, 23, 20); E("#f7e7c0", 36, -105, 11, 8); eye(30, -117);
+    ctx.strokeStyle = "#2a1e12"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(30, -113); ctx.quadraticCurveTo(29, -104, 34, -98); ctx.stroke();
+    E("#2a1e12", 45, -109, 2.6, 2);
+    ctx.fillStyle = c.band; ctx.fillRect(6, -131, 34, 5);
+    return shade;
+  }
+  function bodyBear(c) {
+    const fur = "#f4f6f8", shade = "#c3ced8";
+    E(shade, 6, -5, 26, 8); E(fur, 0, -58, 38, 50); E("#ffffff", 14, -56, 20, 34, 0.08);
+    E(fur, 6, -148, 9, 9); E(shade, 6, -148, 4.5, 4.5); E(fur, 36, -148, 9, 9); E(shade, 36, -148, 4.5, 4.5);
+    E(fur, 20, -124, 29, 25); E("#ffffff", 40, -116, 13, 10); E("#1f2530", 51, -119, 4.5, 3.5); eye(31, -130);
+    ctx.fillStyle = c.band; ctx.fillRect(0, -148, 42, 5);
+    return shade;
+  }
+  function bodyZap(c) {
+    const fur = "#f7d23a", shade = "#c9a41c", brown = "#8a5a1c";
+    ctx.fillStyle = brown; ctx.beginPath(); ctx.moveTo(-20, -30); ctx.lineTo(-30, -44); ctx.lineTo(-22, -48); ctx.lineTo(-14, -36); ctx.fill();
+    if (PUBLIC_BUILD) {                                                   // public look: round spark-ball tail
+      ctx.strokeStyle = fur; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-22, -40); ctx.quadraticCurveTo(-44, -50, -48, -72); ctx.stroke();
+      E("#9fd8ff", -50, -80, 13, 13); E("#ffffff", -54, -84, 4, 4);
+    } else {
+      ctx.fillStyle = fur; ctx.beginPath();                                // lightning-bolt tail
+      [[-26, -44], [-46, -62], [-36, -68], [-60, -94], [-48, -98], [-76, -130], [-40, -106], [-50, -100], [-24, -78], [-32, -72], [-20, -52]].forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+      ctx.fill();
+    }
+    E(shade, 6, -4, 20, 6); E(fur, 0, -50, 30, 42);
+    E(brown, -24, -64, 3.5, 10, 0.5); E(brown, -26, -46, 3.5, 10, 0.5);
+    const tip = PUBLIC_BUILD ? "#2f5fd0" : "#1d1d1d", ear = PUBLIC_BUILD ? 18 : 26, lift = PUBLIC_BUILD ? 8 : 0;
+    E(fur, 4, -146 + lift, 8, ear, -0.35); E(tip, -4 + lift * 0.35, -166 + lift * 2, 5, 9, -0.35);
+    E(fur, 36, -148 + lift, 8, ear, 0.3); E(tip, 44 - lift * 0.3, -168 + lift * 2, 5, 9, 0.3);
+    E(fur, 20, -108, 28, 24); eye(33, -115, 3.8); E(PUBLIC_BUILD ? "#ff8a3d" : "#e8483b", 40, -100, 6, 6); E("#3a2a18", 47, -108, 1.6, 1.3);
+    return shade;
+  }
+  function bodySeal(c, b) {
+    const body = "#94a3b0", belly = "#d3dce4", dark = "#5e6c79";
+    ctx.fillStyle = dark; ctx.beginPath(); ctx.moveTo(-26, -8); ctx.lineTo(-62, -2); ctx.lineTo(-58, 8); ctx.lineTo(-20, 4); ctx.fill();
+    ctx.fillStyle = body; ctx.beginPath(); ctx.moveTo(-30, 0); ctx.bezierCurveTo(-52, -40, -30, -96, 4, -108); ctx.bezierCurveTo(34, -112, 44, -80, 36, -44); ctx.bezierCurveTo(30, -16, 14, 2, -30, 0); ctx.fill();
+    ctx.fillStyle = belly; ctx.beginPath(); ctx.ellipse(18, -44, 13, 36, 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = dark; [[-12, -40], [-22, -66], [0, -84], [-6, -22]].forEach(([x, y]) => { ctx.beginPath(); ctx.ellipse(x, y, 4, 3, 0.4, 0, Math.PI * 2); ctx.fill(); });
+    ctx.fillStyle = body; ctx.beginPath(); ctx.arc(14, -118, 25, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = belly; ctx.beginPath(); ctx.ellipse(34, -110, 13, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1f2530"; ctx.beginPath(); ctx.ellipse(44, -113, 4.5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+    if (b.stun > 0) { ctx.strokeStyle = "#1f2530"; ctx.lineWidth = 2; [[18, -124], [30, -124]].forEach(([x, y]) => { ctx.beginPath(); ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4); ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4); ctx.stroke(); }); }
+    else { ctx.fillStyle = "#1f2530"; [[20, -125], [32, -126]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill(); }); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(21.5, -127, 1.6, 0, Math.PI * 2); ctx.arc(33.5, -128, 1.6, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = "rgba(40,48,60,.7)"; ctx.lineWidth = 1.2;
+    for (const dy of [-3, 0, 3]) { ctx.beginPath(); ctx.moveTo(38, -108 + dy); ctx.lineTo(58, -110 + dy * 2); ctx.stroke(); }
+    ctx.fillStyle = c.band; ctx.fillRect(-6, -142, 38, 5);
+    ctx.fillStyle = dark; ctx.beginPath(); ctx.moveTo(22, -76); ctx.quadraticCurveTo(40, -92, 48, -84); ctx.quadraticCurveTo(38, -70, 26, -66); ctx.fill();
+    return dark;
+  }
+
+  function drawBubble(b) {
+    if (!b.bubble || b.bubbleT > 1.6) return;
+    const p = P(b.x, b.y, b.z), x = p.x, y = p.y - 200 * p.s * CHAR;
+    ctx.globalAlpha = Math.min(1, (1.6 - b.bubbleT) * 3);
+    ctx.font = '700 16px "Noto Sans TC", sans-serif'; const w = ctx.measureText(b.bubble).width + 20;
+    ctx.fillStyle = "#fbf7ee"; roundRect(x - w / 2, y - 17, w, 32, 14); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x - 6, y + 14); ctx.lineTo(x, y + 26); ctx.lineTo(x + 6, y + 14); ctx.fill();
+    ctx.fillStyle = "#1d2340"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(b.bubble, x, y);
+    ctx.globalAlpha = 1;
+  }
+  function drawBall() {
+    let bx = ball.x, by = ball.y, bz = ball.z;
+    if (phase === "serve") { const b = score.server === 0 ? roo : seal, d = score.server === 0 ? 1 : -1; bx = b.x + 0.4 * d; by = b.y + 0.3 * d; bz = tossT >= 0 ? tossZ(tossT) : 0.3 + Math.abs(Math.sin(serveT * 5)) * 0.5; }
+    else if (!ball.live) return;
+    shadow(bx, by, highBall() ? 0.3 : 0.18, highBall() ? "rgba(255,70,50,.6)" : undefined);
+    if (phase === "serve" && tossT >= 0 && Math.abs(tossT - TOSS_V / G) < APEX_OK) {   // perfect-serve window: ring around the ball
+      const q = P(bx, by, bz); ctx.strokeStyle = "#ffd65a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(q.x, q.y, 22 * q.s, 0, Math.PI * 2); ctx.stroke();
+    }
+    const n = ball.trail.length, tc = ball.kind === "sp" ? charOf(ball.owner).sp.rgb : SPIN_RGB[ball.spin || "flat"];
+    if (phase === "rally") {
+      ball.trail.forEach((t, i) => { ctx.fillStyle = `rgba(${tc},${(i / n) * (0.4 + ball.power * 0.5)})`; ctx.beginPath(); ctx.arc(t.x, t.y, (7 + ball.power * 5) * t.s * (i / n), 0, Math.PI * 2); ctx.fill(); });
+      if (ball.power > 0.5 && n > 2) {                                     // speed lines on hard-hit balls
+        ctx.strokeStyle = `rgba(255,255,255,${(ball.power - 0.5) * 0.9})`; ctx.lineWidth = 2;
+        for (const off of [-6, 0, 6]) { ctx.beginPath(); ctx.moveTo(ball.trail[0].x, ball.trail[0].y + off); ctx.lineTo(ball.trail[n - 1].x, ball.trail[n - 1].y + off * 0.3); ctx.stroke(); }
+      }
+    }
+    const p = P(bx, by, bz), r = Math.max(4, 9.5 * p.s);
+    const q = P(bx + ball.vx * 0.02, by + ball.vy * 0.02, bz + ball.vz * 0.02), ang = Math.atan2(q.y - p.y, q.x - p.x);
+    const stretch = phase === "rally" ? (ball.squash > 0 ? 1.8 : 1 + Math.min(0.5, ball.power * 0.5)) : 1;
+    if (ball.kind === "sp") { const g = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, r * 3); g.addColorStop(0, `rgba(${tc},.9)`); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r * 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = ball.kind === "sp" ? "#fff6d0" : "#dff55a";
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(ang); ctx.scale(stretch, 1 / Math.sqrt(stretch));   // squash & stretch
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#f4f8ee"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(-r * 0.5, 0, r * 0.8, -0.9, 0.9); ctx.stroke();
+    ctx.restore();
+  }
+  function drawLandingMark() {
+    const sp = smashSpot();                                               // red ring on the ground = stand here and jump
+    if (sp) {
+      const q = P(sp.x, sp.y), t = performance.now() / 150;
+      ctx.strokeStyle = "rgba(255,90,60,.9)"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(q.x, q.y, (24 + Math.sin(t) * 3) * q.s, (8 + Math.sin(t)) * q.s, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.font = '700 13px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#ff7a5a"; ctx.textAlign = "center"; ctx.fillText("扣殺點", q.x, q.y + 20 * q.s);
+    }
+    if (phase !== "rally" || lastHitter !== 1 || !ball.live || ball.netted || bounces > 0) return;
+    const pr = predict(0); if (!pr.land || pr.land.y > NET_Y) return;
+    const p = P(pr.land.x, pr.land.y), t = performance.now() / 200;
+    ctx.strokeStyle = "rgba(255,214,90,.85)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, (16 + Math.sin(t) * 3) * p.s, (5 + Math.sin(t)) * p.s, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  function drawParticles() {
+    for (const r of rings) {                                              // impact shockwaves
+      const k = r.t / r.life; ctx.globalAlpha = 1 - k; ctx.strokeStyle = r.color; ctx.lineWidth = 6 * (1 - k) + 1;
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r + (r.max - r.r) * Math.sqrt(k), 0, Math.PI * 2); ctx.stroke();
+    }
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, p.life / p.max);
+      if (p.streak) { ctx.strokeStyle = p.color; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.04, p.y - p.vy * 0.04); ctx.stroke(); continue; }
+      ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function meterBar(x, y, v, color, armed) {
+    ctx.fillStyle = "rgba(255,255,255,.12)"; roundRect(x - 50, y, 100, 7, 4); ctx.fill();
+    ctx.fillStyle = armed ? "#ffffff" : color; roundRect(x - 50, y, Math.max(7, 100 * v), 7, 4); ctx.fill();
+  }
+  function drawHUD() {
+    ctx.fillStyle = "rgba(14,17,34,.8)"; roundRect(W / 2 - 190, 10, 380, 78, 10); ctx.fill();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = '500 14px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#a9b0cf";
+    ctx.fillText(me().name, W / 2 - 135, 28); ctx.fillText(opp().name, W / 2 + 135, 28);
+    ctx.font = '400 26px "Bungee", "Noto Sans TC", sans-serif'; ctx.fillStyle = "#f6c453"; ctx.fillText(score.games[0], W / 2 - 135, 54);
+    ctx.fillStyle = "#7fe0ff"; ctx.fillText(score.games[1], W / 2 + 135, 54);
+    meterBar(W / 2 - 135, 74, roo.meter, "#ff8a3a", roo.armed); meterBar(W / 2 + 135, 74, seal.meter, `rgb(${opp().sp.rgb})`, seal.armed);
+    ctx.fillStyle = "#f3f1ea"; ctx.font = '400 20px "Bungee", "Noto Sans TC", sans-serif'; ctx.fillText(pointLabel(), W / 2, 40);
+    ctx.font = '500 12px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#a9b0cf"; ctx.fillText(score.server === 0 ? "● " + me().name + "發球" : opp().name + "發球 ●", W / 2, 66);
+    if (phase === "serve") { ctx.fillStyle = "#f6c453"; ctx.fillText(serveCourt() === "right" ? "右區發球" : "左區發球", W / 2, 80); }
+    ctx.font = '700 14px "Noto Sans TC", sans-serif';
+    if (roo.armed && phase !== "over") { ctx.fillStyle = `rgb(${me().sp.rgb})`; ctx.fillText("下一球自動必殺！", W / 2 - 135, 102); }
+    if (phase === "serve" && score.server === 0) { ctx.font = '700 18px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#f3f1ea"; ctx.fillText(tossT < 0 ? "按「打」拋球（←→ 方向、↑ 上旋、↓ 切球）" : "球在最高點時再按一次！", W / 2, 130); }
+    if (phase === "rally" && rally >= 5) { ctx.font = '400 16px "Bungee", "Noto Sans TC", sans-serif'; ctx.fillStyle = "rgba(246,196,83,.9)"; ctx.fillText(`連續 ${rally} 拍`, W / 2, 130); }
+    if (msg && msgT < 1.4) {
+      ctx.globalAlpha = Math.min(1, 1.6 - msgT); ctx.font = '400 36px "Bungee", "Noto Sans TC", sans-serif';
+      ctx.fillStyle = ball.kind === "sp" ? `rgb(${charOf(ball.owner).sp.rgb})` : "#f6c453";
+      ctx.fillText(msg, W / 2, 190 - msgT * 10); ctx.globalAlpha = 1;
+    }
+  }
+  function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+  function render() {
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    if (shake > 0 && !reduceMotion) ctx.translate((Math.random() - 0.5) * 14 * shake, (Math.random() - 0.5) * 14 * shake);
+    drawCourt(); drawLandingMark();
+    // painter's order: far to near
+    const items = [{ y: seal.y, d: () => drawPlayer(seal) }, { y: NET_Y, d: drawNet }, { y: roo.y, d: () => drawPlayer(roo) }, { y: phase === "serve" ? (score.server === 0 ? roo.y - 0.01 : seal.y - 0.01) : ball.y - 0.01, d: drawBall }];
+    items.sort((a, b) => b.y - a.y).forEach((i) => i.d());
+    drawParticles(); drawBubble(seal); drawBubble(roo); drawHUD();
+    if (flash > 0 && !reduceMotion) { ctx.fillStyle = `rgba(255,240,200,${flash})`; ctx.fillRect(0, 0, W, H); }
+  }
+
+  // ---------- loop
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(1 / 30, (now - last) / 1000); last = now;
+    flash = Math.max(0, flash - dt * 1.5);
+    requestAnimationFrame(frame);                                         // schedule first: one bad frame must never stop the game
+    try {
+      if (freeze > 0) freeze -= dt;
+      else if (phase !== "intro" && phase !== "paused" && phase !== "over") update(dt);
+      else stepParticles(dt);
+      render();
+    } catch (e) { console.error(e); ctx.setTransform(1, 0, 0, 1, 0, 0); }
+  }
+  function update(dt) {
+    msgT += dt; shake = Math.max(0, shake - dt); ball.squash = Math.max(0, ball.squash - dt);
+    stepRoo(dt); stepSeal(dt); stepParticles(dt);
+    if (phase === "serve") {
+      serveT += dt;
+      if (tossT >= 0) { tossT += dt; if (tossZ(tossT) < 0.9) { tossT = -1; msg = "重拋"; msgT = 0; } }   // missed the toss: toss again
+      if (score.server === 1 && serveT > 1.2) doServe(pick(["perfect", "good", "good", "weak"]), Math.random() * 2 - 1, pick(["flat", "flat", "top", "slice"]));
+    }
+    else if (phase === "rally") stepBall(dt);
+    else if (phase === "point") { if (ball.live) stepBall(dt); if (msgT > 1.5) startServe(); }
+  }
+
+  // ---------- input
+  const KEYMAP = { ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down" };
+  addEventListener("keydown", (e) => {
+    if (KEYMAP[e.code]) {
+      keys[KEYMAP[e.code]] = true; e.preventDefault();
+      const k = KEYMAP[e.code], menu = !e.repeat && (phase === "intro" || phase === "over") && !overlay.hidden;
+      const cyc = (ids, cur, d) => ids[(ids.indexOf(cur) + d + ids.length) % ids.length];
+      if (menu && (k === "left" || k === "right")) setChar(cyc(Object.keys(CHARS), charId, k === "left" ? -1 : 1));
+      if (menu && (k === "up" || k === "down")) setOpp(cyc(OPP_IDS, oppPick, k === "up" ? -1 : 1));
+      return;
+    }
+    if (e.repeat) return;
+    if (e.code === "KeyZ" || e.code === "Space" || e.code === "KeyJ") { e.preventDefault(); swing(); }
+    else if (e.code === "KeyX" || e.code === "KeyK") { e.preventDefault(); jump(); }
+    else if (e.code === "KeyP" || e.code === "Escape") togglePause();
+    else if (e.code === "Enter" && (phase === "intro" || phase === "over")) startMatch();
+  });
+  addEventListener("keyup", (e) => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
+  document.querySelectorAll(".pad button").forEach((b) => {
+    const k = b.dataset.k;
+    const on = (e) => { e.preventDefault(); b.classList.add("on"); if (k in keys) keys[k] = true; else if (k === "jump") jump(); else swing(); };
+    const off = () => { b.classList.remove("on"); if (k in keys) keys[k] = false; };
+    b.addEventListener("pointerdown", on); ["pointerup", "pointercancel", "pointerleave"].forEach((t) => b.addEventListener(t, off));
+  });
+
+  const charsEl = document.getElementById("chars"), oppsEl = document.getElementById("opps"), cstat = document.getElementById("cstat");
+  const OPP_IDS = [...Object.keys(CHARS), "random"];
+  function row(el, label, ids, cur, onPick) {
+    el.innerHTML = `<span class="lab">${label}</span>`;
+    for (const id of ids) {
+      const bt = document.createElement("button"); bt.type = "button"; bt.textContent = id === "random" ? "隨機" : CHARS[id].name;
+      bt.setAttribute("aria-pressed", id === cur); bt.addEventListener("click", () => onPick(id)); el.appendChild(bt);
+    }
+  }
+  function renderChars() {
+    row(charsEl, "自己", Object.keys(CHARS), charId, setChar);
+    row(oppsEl, "對手", OPP_IDS, oppPick, setOpp);
+    const c = me(), o = oppPick === "random" ? "隨機（開打時抽）" : `${opp().name}：${opp().tag}`;
+    cstat.textContent = `${c.name}：${c.tag}｜必殺 ${c.sp.name.replace("！", "")}　　對手 ${o}`;
+  }
+  function setChar(id) { charId = id; try { localStorage.setItem("roo-seal-char", id); } catch (e) {} renderChars(); }
+  function setOpp(id) { oppPick = id; if (id !== "random") oppId = id; try { localStorage.setItem("roo-seal-opp", id); } catch (e) {} renderChars(); }
+  function showOverlay(title, text, btn) { ovTitle.textContent = title; ovText.textContent = text; overlay.dataset.mode = "text"; ovBtn.textContent = btn; overlay.hidden = false; charsEl.hidden = oppsEl.hidden = cstat.hidden = phase === "paused"; }
+  function startMatch() {
+    score.pts = [0, 0]; score.games = [0, 0]; score.server = 0; msg = ""; overlay.hidden = true; bestRally = 0; resolveOpp();
+    for (const b of [roo, seal]) { b.meter = 0; b.armed = false; b.bubble = ""; }
+    particles.length = 0; startServe();
+  }
+  function togglePause() {
+    if (phase === "paused") { phase = pausedFrom; overlay.hidden = true; }
+    else if (phase === "serve" || phase === "rally" || phase === "point") { pausedFrom = phase; phase = "paused"; showOverlay("暫停中", "按 P 或下方按鈕繼續。", "繼續"); }
+  }
+  ovBtn.addEventListener("click", () => { if (phase === "paused") togglePause(); else startMatch(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden && (phase === "serve" || phase === "rally" || phase === "point")) togglePause(); });
+  document.getElementById("restart").addEventListener("click", (e) => { e.currentTarget.blur(); startMatch(); });
+  const sBtn = document.getElementById("sound");
+  sBtn.addEventListener("click", () => { soundOn = !soundOn; sBtn.textContent = soundOn ? "音效：開" : "音效：關"; sBtn.setAttribute("aria-pressed", soundOn); sBtn.blur(); });
+  document.querySelectorAll(".seg button").forEach((b) => {
+    b.setAttribute("aria-pressed", b.dataset.lv === level);
+    b.addEventListener("click", () => {
+      level = b.dataset.lv; try { localStorage.setItem("roo-seal-level", level); } catch (e) {}
+      document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", x === b)); b.blur();
+    });
+  });
+
+  function resize() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1), rect = canvas.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
+  }
+  new ResizeObserver(resize).observe(canvas); resize();
+  if (location.hash === "#test") window.__g = { roo, seal, ball, keys, score, awardPoint, startMatch, smashSpot, swing, jump, hitBall, me, opp, predict, serveCourt, get phase() { return phase; }, set phase(v) { phase = v; }, set lastHitter(v) { lastHitter = v; }, get msg() { return msg; }, set msg(v) { msg = v; } };
+  if (oppPick !== "random") oppId = oppPick;
+  renderChars(); placeForServe();
+  requestAnimationFrame(frame);
+})();
+</script>
