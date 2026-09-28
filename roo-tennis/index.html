@@ -64,7 +64,8 @@
   .acts { display: grid; grid-template-columns: 76px 76px; grid-template-rows: 60px 60px; gap: 8px; }
   .acts .hit { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); grid-row: span 2; border-radius: 999px; }
   .acts .jump { grid-row: span 2; border-radius: 999px; }
-  @media (pointer: coarse) { .pad { display: flex; } .keys { display: none; } .quick .touch { display: inline; } }
+  @media (pointer: coarse), (max-width: 640px) { .pad { display: flex; } .keys { display: none; } .quick .touch { display: inline; } }
+  @media (max-width: 600px) { .chars { gap: 4px; } .chars button { padding: 4px 10px; font-size: 13px; } .overlay { gap: 8px; padding: 10px; } .cstat { font-size: 12px; } }
   .help { display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--dim); font-size: 14px; line-height: 1.6; }
   kbd { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text); }
 </style>
@@ -135,7 +136,7 @@
   // speed x (ST_MIN + ST_SPAN * st): fresh legs run 10% faster than base, empty legs 35% slower
   const ST_MIN = 0.65, ST_SPAN = 0.45, ST_RUN = 0.09, ST_CHARGE = 0.22, ST_REST = 0.22, ST_JUMP = 0.1, ST_DIVE = 0.12, ST_POINT = 0.2;
   const TOSS_V = 6, APEX_OK = 0.08;     // serve toss speed; perfect-serve window (s) around the toss apex
-  const K = 78, Y0 = -3.2, YSPAN = L + 6.4, SCR_NEAR = 592, SCR_FAR = 152, FAR_SHRINK = 0.45;
+  const K = 78, Y0 = -3.2, YSPAN = L + 6.4, SCR_NEAR = 562, SCR_FAR = 152, FAR_SHRINK = 0.45;
   const LEVELS = {
     easy:   { speed: 4.2, miss: 0.22, err: 1.4, meter: 0.1 },
     normal: { speed: 5.2, miss: 0.1,  err: 0.8, meter: 0.13 },
@@ -321,7 +322,8 @@
     if (charOf(Lz.side).trait === "rage" && Lz.lostRow >= 2 && !Lz.rage) { Lz.rage = true; Lz.lostRow = 0; }
     if (ev === "miss" && ball.lastShot === "smash") ev = "smashed";
     if (ev === "miss" && (Lz.swingAgo < 0.6 || Lz.willMiss)) ev = "whiff";
-    if (ev === "whiff") Lz.spinT = 0.9;                                    // blooper: spins around after swinging at air
+    if (ev === "whiff") Lz.spinT = 0.9;
+    if (ev === "miss" || ev === "whiff" || ev === "smashed") { msg = pick(EV_LINES[ev][0]); if (ev === "miss") Lz.recover = 0.6; }   // big text: the taunt, not "沒接到"                                    // blooper: spins around after swinging at air
     if (ev === "net") Lz.netFace = 1.4;                                    // blooper: net stuck on the face
     const own = (b, i) => LINES[b === roo ? charId : oppId][i];
     say(W_, pick(Math.random() < 0.5 ? own(W_, 0) : EV_LINES[ev][0])); say(Lz, pick(Math.random() < 0.5 ? own(Lz, 1) : EV_LINES[ev][1]));
@@ -332,7 +334,10 @@
       msg = nameOf(winner) + "拿下這一局";
       if (score.games[winner] >= GAMES_TO_WIN) {
         phase = "over";
-        setTimeout(() => showOverlay(winner === 0 ? me().name + "贏了！" : opp().name + "贏了…", `局數 ${score.games[0]} : ${score.games[1]}　最長連續 ${bestRally} 拍`, "再來一場"), 900);
+        setTimeout(() => {                                                  // skip if a new match / the menu started meanwhile
+          if (phase !== "over") return;
+          showOverlay(winner === 0 ? me().name + "贏了！" : opp().name + "贏了…", `局數 ${score.games[0]} : ${score.games[1]}　最長連續 ${bestRally} 拍`, "再來一場");
+        }, 900);
       }
     }
     beep(winner === 0 ? 660 : 220, 0.25, "sine", 0.2);
@@ -399,7 +404,7 @@
       const sp = charOf(b.side).sp;                                       // kind "sp" + owner: whose special, flight twist in ball.fx
       ball.kind = "sp"; ball.owner = b.side; ball.fx = sp.fx; speed = sp.speed; ty = b.side === 0 ? L - 2.5 : 2.5;
       tx = clamp(aim * 3.3 || (Math.random() < 0.5 ? -3 : 3), -3.6, 3.6); if (sp.fx === "curve") ball.curve = -tx * 3.2;
-      msg = sp.name; color = `rgb(${sp.rgb})`; beep(sp.freeze ? 1200 : 180, 0.5, sp.freeze ? "sine" : "sawtooth", 0.18, sp.freeze ? 0.3 : 4);
+      msg = sp.name; color = `rgb(${sp.rgb})`; b.bubble = "";   // the big text is the call-out; no bubble on top of it beep(sp.freeze ? 1200 : 180, 0.5, sp.freeze ? "sine" : "sawtooth", 0.18, sp.freeze ? 0.3 : 4);
       msgT = 0; burst(hp.x, hp.y, 40, color, 260, 0.7, 120);
     } else if (b.side === 0) {
       b.meter = Math.min(1, b.meter + ((quality === "perfect" ? 0.3 : 0.2) + (charge >= 0.95 ? 0.15 : 0)) * me().meter);
@@ -543,6 +548,7 @@
   function stepSeal(dt) {
     const Lv = LEVELS[level];
     if (seal.z > 0) { airStep(seal, dt); return; }
+    if (seal.recover > 0) { seal.recover -= dt; moveBody(seal, 0, 0, 0, dt); return; }   // flattened after a miss
     // high ball within reach: jump (and smash it, see stepBall)
     const dB = Math.hypot(ball.x - seal.x, ball.y - seal.y), apex = REACH_Z + opp().jump * opp().jump / (2 * G) * 1.6;
     if (phase === "rally" && lastHitter === 0 && !ball.netted && !seal.willMiss && seal.stun <= 0 && seal.frozen <= 0 && ball.y > NET_Y
@@ -556,7 +562,7 @@
     } else { sealDecided = false; seal.willMiss = false; }
     // belly slide: a far ball gets a burst of speed (and a very undignified pose)
     const far = Math.hypot(tx - seal.x, ty - seal.y);
-    if (oppId === "seal" && phase === "rally" && lastHitter === 0 && far > 2.2 && seal.slide <= 0 && seal.stun <= 0 && Math.random() < dt * 3) { seal.slide = 0.55; say(seal, "滑～"); }
+    if ((oppId === "seal" || opp().trait === "slide") && phase === "rally" && lastHitter === 0 && far > 2.2 && seal.slide <= 0 && seal.stun <= 0 && Math.random() < dt * 3) { seal.slide = 0.55; if (seal.bubbleT > 2) say(seal, "滑～"); }
     seal.slide = Math.max(0, seal.slide - dt);
     moveBody(seal, clamp(tx - seal.x, -1, 1) * (Math.abs(tx - seal.x) > 0.1), clamp(ty - seal.y, -1, 1) * (Math.abs(ty - seal.y) > 0.15), Lv.speed * opp().speed / CHARS.seal.speed * (seal.slide > 0 ? 1.7 : 1), dt);
     if (seal.meter >= 1 && !seal.armed && phase === "rally" && lastHitter === 0 && Math.random() < dt * 0.8) { seal.armed = true; say(seal, "看我的" + opp().sp.name.replace("！", "")); }
@@ -581,7 +587,12 @@
       if (lastHitter !== 1 || phase !== "rally" || bounces >= 2) { roo.charging = false; roo.chargeT = 0; }
       if (roo.chargeT > 0.9 && roo.chargeT - dt <= 0.9) beep(1320, 0.12, "triangle", 0.08);
     }
-    if (roo.z > 0) { airStep(roo, dt); return; }
+    if (roo.z > 0) {                                                      // a little air control: nudge toward the ball mid-jump
+      const ax = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), ay = (keys.up ? 1 : 0) - (keys.down ? 1 : 0), cap = me().speed * 0.5;
+      roo.vx = clamp(roo.vx + ax * 6 * dt, -Math.max(cap, Math.abs(roo.vx)), Math.max(cap, Math.abs(roo.vx)));
+      roo.vy = clamp(roo.vy + ay * 6 * dt, -Math.max(cap, Math.abs(roo.vy)), Math.max(cap, Math.abs(roo.vy)));
+      airStep(roo, dt); return;
+    }
     const ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), iy = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
     moveBody(roo, ix, iy, me().speed * (roo.charging ? 0.47 : 1), dt);                  // charging slows you down: commit early or keep running
   }
@@ -601,6 +612,7 @@
     const incoming = lastHitter === 1 && !ball.netted && bounces < 2;
     const d = Math.hypot(ball.x - roo.x, ball.y - roo.y);
     roo.swing = 1; roo.swingAgo = 0;
+    if (roo.charging && !(incoming && d < me().reach && inReachZ())) return;   // already charging: an extra press must not reset it
     if (roo.z > 0) {                                                      // mid-air: racket stays ready until landing, auto-hits a ball in reach
       roo.swingT = (roo.vz + Math.sqrt(roo.vz * roo.vz + 2 * G * roo.z)) / G + 0.05; roo.swingCd = 0.3; return;
     }
@@ -895,12 +907,13 @@
       const q = P(sp.x, sp.y), t = performance.now() / 150;
       ctx.strokeStyle = "rgba(255,90,60,.9)"; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.ellipse(q.x, q.y, (24 + Math.sin(t) * 3) * q.s, (8 + Math.sin(t)) * q.s, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.font = '700 13px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#ff7a5a"; ctx.textAlign = "center"; ctx.fillText("扣殺點", q.x, q.y + 20 * q.s);
+      ctx.font = '700 13px "Noto Sans TC", sans-serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(20,10,20,.55)"; roundRect(q.x - 24, q.y - 9, 48, 18, 8); ctx.fill(); ctx.fillStyle = "#ffb0a0"; ctx.fillText("扣殺點", q.x, q.y);
     }
     if (phase !== "rally" || lastHitter !== 1 || !ball.live || ball.netted || bounces > 0) return;
     const pr = predict(0); if (!pr.land || pr.land.y > NET_Y) return;
     const p = P(pr.land.x, pr.land.y), t = performance.now() / 200;
-    ctx.strokeStyle = "rgba(255,214,90,.85)"; ctx.lineWidth = 2;
+    ctx.strokeStyle = sp ? "rgba(255,214,90,.2)" : "rgba(255,214,90,.85)"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(p.x, p.y, (16 + Math.sin(t) * 3) * p.s, (5 + Math.sin(t)) * p.s, 0, 0, Math.PI * 2); ctx.stroke();
   }
   function drawParticles() {
@@ -920,7 +933,7 @@
     ctx.fillStyle = armed ? "#ffffff" : color; roundRect(x - 50, y, Math.max(7, 100 * v), 7, 4); ctx.fill();
   }
   function drawHUD() {
-    ctx.fillStyle = "rgba(14,17,34,.8)"; roundRect(W / 2 - 190, 10, 380, 78, 10); ctx.fill();
+    ctx.fillStyle = "rgba(14,17,34,.8)"; roundRect(W / 2 - 220, 10, 440, 86, 10); ctx.fill();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = '500 14px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#a9b0cf";
     ctx.fillText(me().name, W / 2 - 135, 28); ctx.fillText(opp().name, W / 2 + 135, 28);
@@ -928,8 +941,11 @@
     ctx.fillStyle = "#7fe0ff"; ctx.fillText(score.games[1], W / 2 + 135, 54);
     meterBar(W / 2 - 135, 74, roo.meter, "#ff8a3a", roo.armed); meterBar(W / 2 + 135, 74, seal.meter, `rgb(${opp().sp.rgb})`, seal.armed);
     for (const [x, b] of [[W / 2 - 135, roo], [W / 2 + 135, seal]]) {       // stamina: green -> red as it runs out
-      ctx.fillStyle = "rgba(255,255,255,.1)"; ctx.fillRect(x - 50, 83, 100, 3);
-      ctx.fillStyle = b.st > 0.5 ? "#5ee08a" : b.st > 0.2 ? "#f6c453" : "#ff5a4a"; ctx.fillRect(x - 50, 83, 100 * b.st, 3);
+      ctx.fillStyle = "rgba(255,255,255,.1)"; ctx.fillRect(x - 50, 84, 100, 6);
+      const blink = b.st < 0.2 && Math.sin(performance.now() / 90) > 0;
+      ctx.fillStyle = blink ? "#ffffff" : b.st > 0.5 ? "#5ee08a" : b.st > 0.2 ? "#f6c453" : "#ff5a4a"; ctx.fillRect(x - 50, 84, 100 * b.st, 6);
+      ctx.font = '500 11px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#a9b0cf"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillText("必殺", x - 54, 78); ctx.fillText("體力", x - 54, 88); ctx.textAlign = "center";
     }
     ctx.fillStyle = "#f3f1ea"; ctx.font = '400 20px "Bungee", "Noto Sans TC", sans-serif'; ctx.fillText(pointLabel(), W / 2, 40);
     ctx.font = '500 12px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#a9b0cf"; ctx.fillText(score.server === 0 ? "● " + me().name + "發球" : opp().name + "發球 ●", W / 2, 66);
@@ -941,6 +957,7 @@
     if (msg && msgT < 1.4) {
       ctx.globalAlpha = Math.min(1, 1.6 - msgT); ctx.font = '400 36px "Bungee", "Noto Sans TC", sans-serif';
       ctx.fillStyle = ball.kind === "sp" ? `rgb(${charOf(ball.owner).sp.rgb})` : "#f6c453";
+      ctx.lineWidth = 5; ctx.strokeStyle = "rgba(10,12,28,.85)"; ctx.lineJoin = "round"; ctx.strokeText(msg, W / 2, 190 - msgT * 10);
       ctx.fillText(msg, W / 2, 190 - msgT * 10); ctx.globalAlpha = 1;
     }
   }
@@ -1022,8 +1039,9 @@
     row(oppsEl, "對手", OPP_IDS, oppPick, setOpp);
     const c = me(); cstat.textContent = `${c.tdesc}｜必殺：${c.sp.name.replace("！", "")}`;
   }
-  function setChar(id) { charId = id; try { localStorage.setItem("roo-seal-char", id); } catch (e) {} renderChars(); }
-  function setOpp(id) { oppPick = id; if (id !== "random") oppId = id; try { localStorage.setItem("roo-seal-opp", id); } catch (e) {} renderChars(); }
+  const inMenu = () => phase === "intro" || phase === "over";               // characters only change between matches
+  function setChar(id) { if (!inMenu()) return; charId = id; try { localStorage.setItem("roo-seal-char", id); } catch (e) {} renderChars(); }
+  function setOpp(id) { if (!inMenu()) return; oppPick = id; if (id !== "random") oppId = id; try { localStorage.setItem("roo-seal-opp", id); } catch (e) {} renderChars(); }
   function showOverlay(title, text, btn) { ovTitle.textContent = title; ovText.textContent = text; overlay.dataset.mode = "text"; ovBtn.textContent = btn; overlay.hidden = false; charsEl.hidden = oppsEl.hidden = cstat.hidden = phase === "paused"; }
   function startMatch() {
     score.pts = [0, 0]; score.games = [0, 0]; score.server = 0; msg = ""; overlay.hidden = true; bestRally = 0; resolveOpp();
@@ -1038,7 +1056,7 @@
   document.addEventListener("visibilitychange", () => { if (document.hidden && (phase === "serve" || phase === "rally" || phase === "point")) togglePause(); });
   // back to the character menu (the intro overlay); the match restarts from "開始比賽"
   function showMenu() {
-    phase = "intro"; ball.live = false; msg = ""; placeForServe();
+    phase = "intro"; ball.live = false; msg = ""; roo.bubble = seal.bubble = ""; placeForServe();
     ovTitle.textContent = "袋鼠打海豹"; ovBtn.textContent = "開始比賽"; delete overlay.dataset.mode;
     charsEl.hidden = oppsEl.hidden = cstat.hidden = false; overlay.hidden = false;
   }
