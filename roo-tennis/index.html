@@ -519,7 +519,7 @@
     if (ball.fx === "curve") ball.curve = -tx * 3.2;
     launch(tx, ty, speed);
     if (ball.curve) ball.vx -= ball.curve * ((ty - ball.y) / ball.vy) / 2;
-    lastHitter = b.side; bounces = 0; ball.netted = false; ball.t = 0; ball.power = 1; ball.lastShot = "counter"; rally++;
+    lastHitter = b.side; bounces = 0; ball.netted = false; ball.t = 0; ball.power = 1; ball.lastShot = "counter";   // rally already counted by hitBall
     const col = `rgb(${charOf(b.side).sp.rgb})`, n = ball.swaps;
     msg = n === 1 ? "退貨！" : n === 2 ? "再退貨！！" : `必殺互懟 ×${n}！`; msgT = 0; say(b, pick(COUNTER_LINES));
     b.swing = 1; b.swingT = 0; b.charging = false; b.chargeT = 0;
