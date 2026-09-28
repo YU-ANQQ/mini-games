@@ -505,7 +505,7 @@
     }
     if (ev === "out") { gag.duckT = 0; gag.duckText = Math.random() < 0.15 ? "嘎？我說進就進！（沒人理牠）" : Math.random() < 0.2 ? "嘎？應該…出界吧？" : pick(["嘎！出界！", "嘎嘎嘎！OUT！", "嘎～眼睛放亮點"]); beep(700, 0.08, "square", 0.12); setTimeout(() => beep(560, 0.1, "square", 0.12), 110); }
     if (Math.random() < 0.06) { gag.crowdT = 0; gag.crowd = "rain"; msg = "天上下起網球雨！"; msgT = 0; for (let i = 0; i < 60; i++) particles.push({ x: Math.random() * W, y: -20 - Math.random() * 200, vx: 0, vy: 100 + Math.random() * 150, life: 2.2, max: 2.2, color: "#dff25a", grav: 400, r: 5 }); }
-    if (raged) { msg = "綠巨人暴怒！"; say(Lz, "吼——！！"); const rp = P(Lz.x, Lz.y, 1); rageRoar(rp); shake = Math.max(shake, 0.7); }
+    if (raged) { msg = "綠巨人暴怒！"; say(Lz, "吼——！！"); const rp = P(Lz.x, Lz.y, 1); rageRoar(rp); burst(rp.x, rp.y - 20, 26, "#f4f4f0", 240, 0.9, 260); shake = Math.max(shake, 0.7); }   // + white shirt shreds
     if (rally >= HEAT_PRIZE && !W_.armed) {                                 // long-rally prize: the winner's special is ready
       W_.meter = 1; W_.armed = true; msg = `${rally} 拍大戰勝利！必殺集滿`; msgT = 0; say(W_, "必殺準備！");
     }
@@ -670,10 +670,12 @@
     lastHitter = b.side; bounces = 0; ball.netted = false; ball.t = 0; ball.power = power; ball.lastShot = shot;
     if (gag.pigeonT < 0 && ball.kind === "normal" && rally >= 3 && Math.random() < 0.05) { gag.pigeonT = 0; gag.pigeonDone = false; beep(500, 0.1, "triangle", 0.1, 0.5); }
     const ch = charOf(b.side), foe = b.side === 0 ? seal : roo;
-    if (ch.trait === "heavy" && charge >= 0.95 && ball.kind === "normal") { ball.heavy = true; ball.yeet = true; msg = pick(["熊掌全壘打！", "便當蓋！全壘打！"]); msgT = 0; }
+    if (ch.trait === "heavy" && charge >= 0.95 && ball.kind === "normal") { ball.heavy = true; ball.yeet = true; msg = pick(["熊掌全壘打！", "便當蓋！全壘打！"]); msgT = 0;
+      particles.push({ x: hp.x, y: hp.y, vx: (b.side === 0 ? 1 : -1) * 120, vy: -420, life: 1.1, max: 1.1, color: "#b8322a", grav: 700, r: 10 }); burst(hp.x, hp.y, 10, "#fff8ec", 160, 0.5); }   // bento lid + rice
     if (ch.trait === "rage" && b.rage && ball.kind === "normal") { ball.heavy = true; ball.rage = true; power = 1; color = "#ff5a3c"; msg = "暴怒重擊！"; msgT = 0; shake = 0.9; freeze = 0.25; rageRoar(hp); }
     if (ch.trait === "static" && quality === "perfect") {                 // electric mouse trait: perfect hit zaps the other side
       foe.stun = Math.max(foe.stun, 0.9); say(foe, "滋滋滋滋…"); const fp = P(foe.x, foe.y, 1); burst(fp.x, fp.y, 18, "#fff27a", 180, 0.4, 0);
+      for (let k = 1; k < 14; k++) { const f = k / 14; particles.push({ x: hp.x + (fp.x - hp.x) * f + (Math.random() - 0.5) * 18, y: hp.y + (fp.y - hp.y) * f + (Math.random() - 0.5) * 18, vx: 0, vy: 0, life: 0.3, max: 0.3, color: "#fff27a", grav: 0, r: 3 }); }   // lightning chain
     }
     b.swing = 1; b.swingT = 0; b.charging = false; b.chargeT = 0;
     impact(hp.x, hp.y, power, color); if (b.side === 0) buzz(Math.round(12 + power * 45));   // phone haptics: only your own racket
@@ -784,7 +786,7 @@
     b.noseUsed = (b.noseUsed || 0) + 1; ball.z = 0.8; ball.kind = "normal"; ball.curve = 0; ball.spin = "flat"; ball.heavy = false; ball.yeet = false; ball.rage = false;   // a nose return is always a harmless lob
     launch((Math.random() - 0.5) * 3, side === 0 ? NET_Y + 4 : NET_Y - 4, 10);
     lastHitter = side; bounces = 0; ball.netted = false; ball.t = 0; ball.lastShot = "nose"; rally++;
-    msg = "鼻子頂球！"; msgT = 0; say(b, "頂！"); const hp = P(ball.x, ball.y, ball.z); impact(hp.x, hp.y, 0.3, "#bff1ff");
+    msg = pick(["鼻子頂球！", "鼻之奧義！", "海豹頂功！"]); msgT = 0; say(b, pick(["頂！", "鼻子才是本體", "嗷嗷！"])); const hp = P(ball.x, ball.y, ball.z); impact(hp.x, hp.y, 0.3, "#bff1ff");
     return true;
   }
   // predict where the ball can be taken on a side: first spot after the bounce at a comfortable height
@@ -855,6 +857,11 @@
     b.x = clamp(b.x + b.vx * dt, -6.2, 6.2);
     b.y = b.side === 0 ? clamp(b.y + b.vy * dt, -2.8, NET_Y - 1) : clamp(b.y + b.vy * dt, NET_Y + 1, L + 3.2);
     b.swing = Math.max(0, b.swing - dt * 4); b.swingT = Math.max(0, b.swingT - dt); b.swingCd = Math.max(0, b.swingCd - dt); b.bubbleT += dt; b.stuckT -= dt;
+    if (b.z <= 0 && b.meteor) {                                             // kangaroo meteor landing: cracks, shake, a big call-out (show only)
+      b.meteor = false; gag.cracks.push({ x: b.x, y: b.y, r: 1.1, a: Math.random() * 6 }); shake = Math.max(shake, 0.9); freeze = Math.max(freeze, 0.12);
+      msg = "袋鼠流星！"; msgT = 0; const mp = P(b.x, b.y); burst(mp.x, mp.y, 36, "#c0652e", 260, 0.6); rings.push({ x: mp.x, y: mp.y, r: 10, max: 150, life: 0.4, t: 0, color: "#ffb35a" }); beep(80, 0.4, "sawtooth", 0.2, -20);
+      if (b.side === 0) buzz([40, 30, 80]);
+    }
     if (b.z <= 0) { b.z = 0; b.vz = 0; b.dj = 0; const p = P(b.x, b.y); burst(p.x, p.y, 8, "rgba(200,215,240,.8)", 90, 0.35, 150); beep(140, 0.08, "sine", 0.12); }
   }
   function stepRoo(dt) {
@@ -870,6 +877,7 @@
       if (lastHitter !== 1 || phase !== "rally" || bounces >= 2) { roo.charging = false; roo.chargeT = 0; }
       if (roo.chargeT > 0.9 && roo.chargeT - dt <= 0.9) beep(1320, 0.12, "triangle", 0.08);
     }
+    if (roo.meteor && roo.vz < 0) roo.vz = Math.min(roo.vz, -14);          // meteor: falls like a rock once past the top
     if (roo.z > 0) {                                                      // a little air control: nudge toward the ball mid-jump
       const ax = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), ay = (keys.up ? 1 : 0) - (keys.down ? 1 : 0), cap = me().speed * 0.5;
       roo.vx = clamp(roo.vx + ax * 6 * dt, -Math.max(cap, Math.abs(roo.vx)), Math.max(cap, Math.abs(roo.vx)));
@@ -914,7 +922,8 @@
     if (phase !== "rally" || roo.diveT > 0 || roo.recover > 0 || roo.frozen > 0 || roo.stun > 0) return;
     if (roo.z > 0) {                                                      // kangaroo trait: one more jump in the air
       if (me().trait !== "dj" || roo.dj >= 2) return;
-      roo.dj = (roo.dj || 0) + 1; roo.vz = me().jump * 0.85; roo.st = Math.max(0, roo.st - ST_JUMP * (roo.rage ? 2 : 1)); say(roo, roo.dj === 1 ? "二段跳！" : "三段跳！！"); beep(620, 0.12, "sine", 0.08, 1.6);
+      roo.dj = (roo.dj || 0) + 1; roo.vz = me().jump * 0.85; if (roo.dj === 1) roo.st = Math.max(0, roo.st - ST_JUMP * (roo.rage ? 2 : 1)); say(roo, roo.dj === 1 ? "二段跳！" : "三段跳！！");
+      if (roo.dj === 2) roo.meteor = true;                                  // third jump is free: it ends as a meteor strike instead beep(620, 0.12, "sine", 0.08, 1.6);
       if (roo.swingT > 0) roo.swingT = (roo.vz + Math.sqrt(roo.vz * roo.vz + 2 * G * roo.z)) / G + 0.05;   // racket stays ready till the new landing
       return;
     }
