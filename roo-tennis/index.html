@@ -1,4 +1,4 @@
-<title>Roo vs Seal</title>
+<title>網球大亂鬥</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
@@ -72,7 +72,7 @@
 
 <div class="wrap">
   <div class="top">
-    <h1><span class="roo">Roo</span> <span class="vs">vs</span> <span class="seal">Seal</span></h1>
+    <h1><span class="roo">網球</span><span class="seal">大亂鬥</span></h1>
     <div class="opts">
       <div class="seg" role="group" aria-label="難度">
         <button type="button" id="lv-easy" data-lv="easy" aria-pressed="false">簡單</button>
@@ -85,9 +85,9 @@
   </div>
 
   <div class="stage" id="stage">
-    <canvas id="c" aria-label="袋鼠打海豹網球遊戲畫面"></canvas>
+    <canvas id="c" aria-label="網球大亂鬥遊戲畫面"></canvas>
     <div class="overlay" id="overlay">
-      <h2 id="ov-title">袋鼠打海豹</h2>
+      <h2 id="ov-title">網球大亂鬥</h2>
       <p id="ov-text"></p>
       <div class="chars" id="chars" role="group" aria-label="選角色"></div>
       <div class="chars" id="opps" role="group" aria-label="選對手"></div>
@@ -135,6 +135,7 @@
   // stamina (b.st 0..1): moving drains, standing recovers, charging drains extra (the price of holding a charge);
   // speed x (ST_MIN + ST_SPAN * st): fresh legs run 10% faster than base, empty legs 35% slower
   const ST_MIN = 0.65, ST_SPAN = 0.45, ST_RUN = 0.09, ST_CHARGE = 0.22, ST_REST = 0.22, ST_JUMP = 0.1, ST_DIVE = 0.12, ST_POINT = 0.2;
+  const ST_HIT_FROM = 18, ST_HIT = 0.006;  // receiving a fast ball: stamina lost per m/s above ST_HIT_FROM (smash 32 → ~0.08)
   const TOSS_V = 6, APEX_OK = 0.08;     // serve toss speed; perfect-serve window (s) around the toss apex
   const K = 78, Y0 = -3.2, YSPAN = L + 6.4, SCR_NEAR = 562, SCR_FAR = 152, FAR_SHRINK = 0.45;
   const LEVELS = {
@@ -379,6 +380,8 @@
   function hitBall(b, shot, quality, aim, charge = 0) {
     rally++; bestRally = Math.max(bestRally, rally);
     const hp = P(ball.x, ball.y, ball.z);
+    const inSpd = Math.hypot(ball.vx, ball.vy);                           // fast incoming ball costs stamina to hold
+    if (inSpd > ST_HIT_FROM) b.st = Math.max(0, b.st - (inSpd - ST_HIT_FROM) * ST_HIT * charOf(b.side).stDrain);
     // receiving a power shot: knocked back, weak floater
     if (ball.kind === "sp" && ball.owner !== b.side) {
       const sp = charOf(ball.owner).sp, col = `rgb(${sp.rgb})`;
@@ -1080,7 +1083,7 @@
   // back to the character menu (the intro overlay); the match restarts from "開始比賽"
   function showMenu() {
     phase = "intro"; ball.live = false; msg = ""; roo.bubble = seal.bubble = ""; placeForServe();
-    ovTitle.textContent = "袋鼠打海豹"; ovBtn.textContent = "開始比賽"; delete overlay.dataset.mode;
+    ovTitle.textContent = "網球大亂鬥"; ovBtn.textContent = "開始比賽"; delete overlay.dataset.mode;
     charsEl.hidden = oppsEl.hidden = cstat.hidden = false; overlay.hidden = false;
   }
   document.getElementById("restart").addEventListener("click", (e) => { e.currentTarget.blur(); showMenu(); });
