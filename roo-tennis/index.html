@@ -242,10 +242,10 @@
     whiff: [["揮空了哈哈", "空氣好打嗎？"], ["揮、揮空…", "拍子有洞"]],
     yeet: [["全壘打！", "慢走不送～", "你還差得遠呢"], ["我在飛——", "媽我在天上"]],
   };
-  let charId = "roo";
+  let charId = "hulk";
   try { const c = localStorage.getItem("roo-seal-char"); if (c && CHARS[c]) charId = c; } catch (e) {}
   // opponent: oppPick is the menu choice ("random" or an id); oppId is resolved per match. The AI still drives the `seal` body.
-  let oppPick = "seal", oppId = "seal";
+  let oppPick = "cap", oppId = "cap";
   try { const c = localStorage.getItem("roo-seal-opp"); if (c && (c === "random" || CHARS[c])) oppPick = c; } catch (e) {}
   const resolveOpp = () => { const ids = Object.keys(CHARS).filter((id) => id !== charId); oppId = oppPick === "random" ? pick(ids) : oppPick; };
   const me = () => CHARS[charId], opp = () => CHARS[oppId];
