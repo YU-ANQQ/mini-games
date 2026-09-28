@@ -130,6 +130,7 @@
       <div class="chars" id="chars" role="group" aria-label="選角色"></div>
       <div class="chars" id="opps" role="group" aria-label="選對手"></div>
       <div class="chars" id="courts" role="group" aria-label="選場地"></div>
+      <div class="chars" id="sets" role="group" aria-label="選賽制"></div>
       <div class="cstat" id="cstat"></div>
       <button type="button" class="play" id="ov-btn">開始比賽</button>
       <div class="rotate touchonly">↻ 手機橫放更好玩</div>
@@ -192,7 +193,11 @@
   let courtId = "hard";
   try { const c = localStorage.getItem("roo-seal-court"); if (c && COURTS[c]) courtId = c; } catch (e) {}
   const court = () => COURTS[courtId];
-  const POINT_NAMES = ["0", "15", "30", "40"], GAMES_TO_WIN = 3;
+  const POINT_NAMES = ["0", "15", "30", "40"];
+  // match length (menu row 賽制, localStorage roo-seal-sets): games needed to win; 1 = one-game shoot-out (quick phone match)
+  const SETS = { 1: "一局決勝", 2: "搶 2 局", 3: "搶 3 局" };
+  let gamesToWin = 3;
+  try { const g = +localStorage.getItem("roo-seal-sets"); if (SETS[g]) gamesToWin = g; } catch (e) {}
   // playable characters: trait (signature move, see TRAITS below), stDrain (stamina use x), speed (m/s), jump (take-off m/s), reach / dive (m), power (shot speed x), meter (charge gain x),
   // sp = special shot: name, speed, rgb (trail/glow), fx (flight twist in stepBall), hurt (receiver's line); draw = body painter
   const CHARS = {
@@ -413,9 +418,20 @@
     Object.assign(roo, { stuckT: 0, koT: 0, tomatoT: 0, x: srv === 0 ? sx : rx, y: srv === 0 ? -0.5 : 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
     Object.assign(seal, { stuckT: 0, koT: 0, tomatoT: 0, x: srv === 1 ? sx : rx, y: srv === 1 ? L + 0.5 : L - 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
   }
+  // side that wins the match with the next point (or -1)
+  function matchPointSide() {
+    const p = score.pts;
+    for (const s of [0, 1]) if (score.games[s] === gamesToWin - 1 && p[s] >= 3 && p[s] > p[1 - s]) return s;
+    return -1;
+  }
   function startServe() {
     gag.cracks = []; placeForServe(); phase = "serve"; serveT = 0; tossT = -1; ball.live = false; ball.kind = "normal"; ball.trail = []; ball.netted = false; ball.heavy = false; ball.rage = false; ball.yeet = false; ball.tech = null; ball.swaps = 0;
     lastHitter = score.server; bounces = 0; rally = 0;
+    const mp = matchPointSide();
+    if (mp >= 0 && phase === "serve") {
+      msg = mp === 0 ? "賽點！" : "對手賽點！"; msgT = 0; say(mp === 0 ? seal : roo, pick(["我還沒輸！", "拚了！", "不要大意啊…"]));
+      [0, 380, 760].forEach((t) => setTimeout(() => { beep(70, 0.16, "sine", 0.25); setTimeout(() => beep(62, 0.12, "sine", 0.2), 150); }, t));   // heartbeat
+    }
   }
   // ev: "net" | "out" | "miss" (what ended the point); turned into "smashed" / "whiff" when that is the funnier truth
   function awardPoint(winner, why, ev = "miss") {
@@ -448,7 +464,8 @@
     if (p[winner] >= 4 && p[winner] - p[1 - winner] >= 2) {
       score.games[winner]++; score.pts = [0, 0]; score.server = 1 - score.server;
       msg = nameOf(winner) + "拿下這一局";
-      if (score.games[winner] >= GAMES_TO_WIN) {
+      if (score.games[winner] >= gamesToWin) {
+        freeze = 0.7; flash = 0.7; shake = 1; msg = winner === 0 ? "比賽結束！贏了！" : "比賽結束…"; gag.crowd = "wild"; gag.crowdT = 0;   // match-winning point: long freeze-frame
         phase = "over";
         setTimeout(() => {                                                  // skip if a new match / the menu started meanwhile
           if (phase !== "over") return;
@@ -1188,6 +1205,11 @@
       ctx.fillText("必殺", x - 54, 78); ctx.fillText("體力", x - 54, 88); ctx.textAlign = "center";
     }
     ctx.fillStyle = "#f3f1ea"; ctx.font = '400 20px "Bungee", "Noto Sans TC", sans-serif'; ctx.fillText(pointLabel(), W / 2, 40);
+    const mp = phase === "serve" || phase === "rally" ? matchPointSide() : -1;
+    if (mp >= 0) {                                                        // match point tag, pulsing on the side that can finish it
+      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(performance.now() / 120); ctx.font = '700 13px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#ff5a4a";
+      ctx.fillText("賽點", mp === 0 ? W / 2 - 60 : W / 2 + 60, 40); ctx.globalAlpha = 1;
+    }
     ctx.font = '500 12px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#a9b0cf"; ctx.fillText(score.server === 0 ? "● " + me().name + "發球" : opp().name + "發球 ●", W / 2, 66);
     if (phase === "serve") { ctx.fillStyle = "#f6c453"; ctx.fillText(serveCourt() === "right" ? "右區發球" : "左區發球", W / 2, 80); }
     ctx.font = '700 14px "Noto Sans TC", sans-serif';
@@ -1330,7 +1352,7 @@
 
   const padEl = document.getElementById("pad"), pauseEl = document.getElementById("pausebtn");
   if (touch) overlay.insertBefore(document.querySelector(".opts"), document.getElementById("ov-btn"));   // header is hidden in touch mode: difficulty / sound / 重選角色 live in the menu (and the pause screen)
-  const charsEl = document.getElementById("chars"), oppsEl = document.getElementById("opps"), courtsEl = document.getElementById("courts"), cstat = document.getElementById("cstat");
+  const charsEl = document.getElementById("chars"), oppsEl = document.getElementById("opps"), courtsEl = document.getElementById("courts"), setsEl = document.getElementById("sets"), cstat = document.getElementById("cstat");
   const OPP_IDS = [...Object.keys(CHARS), "random"];
   function row(el, label, ids, cur, onPick) {
     el.innerHTML = `<span class="lab">${label}</span>`;
@@ -1347,12 +1369,17 @@
       const bt = document.createElement("button"); bt.type = "button"; bt.textContent = COURTS[id].name; bt.setAttribute("aria-pressed", id === courtId);
       bt.addEventListener("click", () => { if (!inMenu()) return; courtId = id; try { localStorage.setItem("roo-seal-court", id); } catch (e) {} renderChars(); }); ce.appendChild(bt);
     }
+    setsEl.innerHTML = `<span class="lab">賽制</span>`;
+    for (const n of Object.keys(SETS)) {
+      const bt = document.createElement("button"); bt.type = "button"; bt.textContent = SETS[n]; bt.setAttribute("aria-pressed", +n === gamesToWin);
+      bt.addEventListener("click", () => { if (!inMenu()) return; gamesToWin = +n; try { localStorage.setItem("roo-seal-sets", n); } catch (e) {} renderChars(); }); setsEl.appendChild(bt);
+    }
     const c = me(); cstat.textContent = `${c.tdesc}｜必殺：${c.sp.name.replace("！", "")}｜超必殺：${SUPERS[charId].hint}\n場地・${court().name}：${court().desc}`;
   }
   const inMenu = () => phase === "intro" || phase === "over";               // characters only change between matches
   function setChar(id) { if (!inMenu()) return; charId = id; try { localStorage.setItem("roo-seal-char", id); } catch (e) {} renderChars(); }
   function setOpp(id) { if (!inMenu()) return; oppPick = id; if (id !== "random") oppId = id; try { localStorage.setItem("roo-seal-opp", id); } catch (e) {} renderChars(); }
-  function showOverlay(title, text, btn) { ovTitle.textContent = title; ovText.textContent = text; overlay.dataset.mode = "text"; ovBtn.textContent = btn; overlay.hidden = false; charsEl.hidden = oppsEl.hidden = courtsEl.hidden = cstat.hidden = phase === "paused"; }
+  function showOverlay(title, text, btn) { ovTitle.textContent = title; ovText.textContent = text; overlay.dataset.mode = "text"; ovBtn.textContent = btn; overlay.hidden = false; charsEl.hidden = oppsEl.hidden = courtsEl.hidden = setsEl.hidden = cstat.hidden = phase === "paused"; }
   function startMatch() {
     if (touch && !document.fullscreenElement && document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape")).catch(() => {});
@@ -1373,7 +1400,7 @@
   function showMenu() {
     phase = "intro"; ball.live = false; msg = ""; roo.bubble = seal.bubble = ""; placeForServe();
     ovTitle.textContent = "網球大亂鬥"; ovBtn.textContent = "開始比賽"; delete overlay.dataset.mode;
-    charsEl.hidden = oppsEl.hidden = courtsEl.hidden = cstat.hidden = false; overlay.hidden = false;
+    charsEl.hidden = oppsEl.hidden = courtsEl.hidden = setsEl.hidden = cstat.hidden = false; overlay.hidden = false;
   }
   document.getElementById("restart").addEventListener("click", (e) => { e.currentTarget.blur(); showMenu(); });
   const sBtn = document.getElementById("sound");
