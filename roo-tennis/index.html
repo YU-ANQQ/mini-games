@@ -266,9 +266,9 @@
   };
   // parody "tennis anime" moves: a perfect (non-smash, non-special) hit sometimes turns into one of these
   const TECHS = {
-    snake:   { name: "繞網蛇球！", rgb: "190,120,255" },                   // swings wide around the net post and curls back in
-    zero:    { name: "零式削球！", rgb: "255,255,255" },                   // bounces backwards toward the net
-    swallow: { name: "燕回閃！", rgb: "140,255,200" },                    // does not bounce up: rolls away along the ground
+    snake:   { name: "繞網蛇球！", rgb: "190,120,255", sub: "繞過網柱再拐回來" },                   // swings wide around the net post and curls back in
+    zero:    { name: "零式削球！", rgb: "255,255,255", sub: "落地後往網子倒退" },                   // bounces backwards toward the net
+    swallow: { name: "燕回閃！", rgb: "140,255,200", sub: "落地不彈，直接滾走" },                    // does not bounce up: rolls away along the ground
   };
   const TECH_CHANCE = 0.35;
   // counter ("退貨"): receive the other side's special with a perfect hit or a MAX charge -> it flies back as YOUR special,
@@ -337,6 +337,7 @@
   const particles = [];
 
   const say = (b, t) => { b.bubble = t; b.bubbleT = 0; };
+  let msgSub = "", msgSubOf = "";                                          // small line under the big text, shown only while msg is still the one it explains
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -446,7 +447,7 @@
     lastHitter = score.server; bounces = 0; rally = 0;
     const mp = matchPointSide();
     if (mp >= 0 && phase === "serve") {
-      msg = mp === 0 ? "賽點！" : "對手賽點！"; msgT = 0; say(mp === 0 ? seal : roo, pick(["我還沒輸！", "拚了！", "不要大意啊…"]));
+      msg = mp === 0 ? pick(["賽點！", "要贏了啦！", "最後一球！"]) : pick(["對手賽點！", "沒了啦！", "要輸了啦！"]); msgT = 0; say(mp === 0 ? seal : roo, pick(["我還沒輸！", "拚了！", "不要大意啊…"]));
       [0, 380, 760].forEach((t) => setTimeout(() => { beep(70, 0.16, "sine", 0.25); setTimeout(() => beep(62, 0.12, "sine", 0.2), 150); }, t));   // heartbeat
     }
   }
@@ -484,7 +485,7 @@
     }
     const p = score.pts; p[winner]++;
     if (p[winner] >= 4 && p[winner] - p[1 - winner] >= 2) {
-      score.games[winner]++; score.pts = [0, 0]; score.server = 1 - score.server;
+      score.games[winner]++; score.pts = [0, 0]; score.server = 1 - score.server; gag.netRip = null;   // groundskeeper fixed the net
       msg = nameOf(winner) + "拿下這一局";
       if (score.games[winner] >= gamesToWin) {
         freeze = 0.7; flash = 0.7; shake = 1; msg = winner === 0 ? "比賽結束！贏了！" : "比賽結束…"; if (winner === 0) playClip("win", true); gag.crowd = "wild"; gag.crowdT = 0;   // match-winning point: long freeze-frame
@@ -612,7 +613,7 @@
       msg = sp.name; color = `rgb(${sp.rgb})`; b.bubble = "";   // the big text is the call-out; no bubble on top of it beep(sp.freeze ? 1200 : 180, 0.5, sp.freeze ? "sine" : "sawtooth", 0.18, sp.freeze ? 0.3 : 4);
       msgT = 0; burst(hp.x, hp.y, 40, color, 260, 0.7, 120);
       if (sp.zone) { b.zoneT = sp.zone; say(b, "不要大意地上吧"); }         // cap: every return is pulled to him for a while
-      if (sp.timestop) { foe0(b).frozen = Math.max(foe0(b).frozen, sp.timestop); gag.timeStopT = sp.timestop; }   // zap: the world stops (for the other side)
+      if (sp.timestop) { foe0(b).frozen = Math.max(foe0(b).frozen, sp.timestop); gag.timeStopT = sp.timestop; gag.timeStopBy = b.side; }   // zap: the world stops (for the other side)
       if (sp.fx === "clone" && b.side === 0) seal.willMiss = Math.random() < 0.5;   // roo: AI swings at a clone half the time
       if (isSuper) { speed *= 1.3; msg = sup.name; ball.yeet = true; freeze = 0.4; flash = 0.6; shake = 1.2; rageRoar(hp); }
       playClip(b.side === 0 ? charId : oppId, isSuper);
@@ -633,7 +634,7 @@
     if (rageShot) speed = Math.max(speed, 46);
     launch(tx, ty, speed, rageShot ? 0.2 : 0.45);
     if (quality === "perfect" && shot !== "smash" && ball.kind === "normal" && Math.random() < (b.side === 0 ? TECH_CHANCE : TECH_CHANCE / 3)) {
-      ball.tech = pick(Object.keys(TECHS)); msg = TECHS[ball.tech].name; msgT = 0; color = `rgb(${TECHS[ball.tech].rgb})`; freeze = Math.max(freeze, 0.2);
+      ball.tech = pick(Object.keys(TECHS)); msg = TECHS[ball.tech].name; msgSub = TECHS[ball.tech].sub; msgSubOf = msg; msgT = 0; color = `rgb(${TECHS[ball.tech].rgb})`; freeze = Math.max(freeze, 0.2);
       if (ball.tech === "snake") {                                        // curve so strong the mid-flight bulge (curve*T^2/8) clears the post
         const T = Math.abs((ty - ball.y) / ball.vy); ball.curve = -Math.sign(ball.x || aim || 1) * 8 * 7.5 / (T * T);
       }
@@ -642,7 +643,7 @@
     lastHitter = b.side; bounces = 0; ball.netted = false; ball.t = 0; ball.power = power; ball.lastShot = shot;
     if (gag.pigeonT < 0 && ball.kind === "normal" && rally >= 3 && Math.random() < 0.05) { gag.pigeonT = 0; gag.pigeonDone = false; beep(500, 0.1, "triangle", 0.1, 0.5); }
     const ch = charOf(b.side), foe = b.side === 0 ? seal : roo;
-    if (ch.trait === "heavy" && charge >= 0.95 && ball.kind === "normal") { ball.heavy = true; ball.yeet = true; msg = "熊掌全壘打！"; msgT = 0; }
+    if (ch.trait === "heavy" && charge >= 0.95 && ball.kind === "normal") { ball.heavy = true; ball.yeet = true; msg = pick(["熊掌全壘打！", "便當蓋！全壘打！"]); msgT = 0; }
     if (ch.trait === "rage" && b.rage && ball.kind === "normal") { ball.heavy = true; ball.rage = true; power = 1; color = "#ff5a3c"; msg = "暴怒重擊！"; msgT = 0; shake = 0.9; freeze = 0.25; rageRoar(hp); }
     if (ch.trait === "static" && quality === "perfect") {                 // electric mouse trait: perfect hit zaps the other side
       foe.stun = Math.max(foe.stun, 0.9); say(foe, "滋滋滋滋…"); const fp = P(foe.x, foe.y, 1); burst(fp.x, fp.y, 18, "#fff27a", 180, 0.4, 0);
@@ -692,7 +693,7 @@
     // net
     if (ball.tech === "snake" && (py - NET_Y) * (ball.y - NET_Y) <= 0) { if (ball.z < NET_H) { msg = "繞過網柱了！"; msgT = 0; } }   // goes around, never into the net
     else if (ball.rage && (py - NET_Y) * (ball.y - NET_Y) <= 0 && ball.z < NET_H) {   // rage ball: rips through the net
-      const np = P(ball.x, NET_Y, ball.z); burst(np.x, np.y, 30, "#ffffff", 260, 0.6); shake = Math.max(shake, 0.6); msg = "網子破了！"; msgT = 0;
+      const np = P(ball.x, NET_Y, ball.z); burst(np.x, np.y, 30, "#ffffff", 260, 0.6); shake = Math.max(shake, 0.6); gag.netRip = { x: ball.x, z: clamp(ball.z, 0.25, NET_H - 0.25) }; msg = "網子破了！"; msgT = 0;
     }
     else if (!ball.netted && (py - NET_Y) * (ball.y - NET_Y) <= 0 && ball.z < NET_H) {
       ball.netted = true; ball.y = NET_Y - Math.sign(ball.vy) * 0.08; ball.vy *= -0.15; ball.vx *= 0.2;
@@ -836,6 +837,7 @@
     }
     if (roo.recover > 0) { roo.recover -= dt; moveBody(roo, 0, 0, 0, dt); return; }
     if (roo.charging) {
+      if (me().trait === "heavy" && roo.chargeT === 0) say(roo, pick(["等我吃完便當…", "便當配飯中", "先吃飽再打"]));   // bear barely moves while charging: it's lunch
       roo.chargeT += dt;
       if (lastHitter !== 1 || phase !== "rally" || bounces >= 2) { roo.charging = false; roo.chargeT = 0; }
       if (roo.chargeT > 0.9 && roo.chargeT - dt <= 0.9) beep(1320, 0.12, "triangle", 0.08);
@@ -952,6 +954,13 @@
     for (let x = -DOUBLES_HALF; x <= DOUBLES_HALF; x += 0.5) { const p = P(x, NET_Y), q = P(x, NET_Y, NET_H); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke(); }
     ctx.strokeStyle = "#f3f6fb"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(at.x, at.y); ctx.lineTo(bt.x, bt.y); ctx.stroke();
     ctx.fillStyle = "#1a1d33"; [a, b].forEach((p, i) => { const t = i ? bt : at; ctx.fillRect(p.x - 3, t.y - 4, 6, p.y - t.y + 4); });
+    if (gag.netRip) {                                                      // rage ball hole: jagged gap + an X of duct tape (until the next game)
+      const h = P(gag.netRip.x, NET_Y, gag.netRip.z), r = 34 * h.s;
+      ctx.fillStyle = "#1b2a55"; ctx.beginPath();
+      for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, k = i % 2 ? 0.65 : 1; ctx.lineTo(h.x + Math.cos(a) * r * k * 1.3, h.y + Math.sin(a) * r * k); }
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(190,190,200,.9)"; ctx.lineWidth = 7 * h.s; ctx.beginPath(); ctx.moveTo(h.x - r * 1.4, h.y - r); ctx.lineTo(h.x + r * 1.4, h.y + r); ctx.moveTo(h.x + r * 1.4, h.y - r); ctx.lineTo(h.x - r * 1.4, h.y + r); ctx.stroke();
+    }
   }
 
   function shadow(x, y, r, color = "rgba(10,14,40,.35)") { const p = P(x, y); ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(p.x, p.y + 2, r * p.s, r * 0.28 * p.s, 0, 0, Math.PI * 2); ctx.fill(); }
@@ -1028,7 +1037,10 @@
     }
     if (shade && !(b.noRacketT > 0)) drawRacket(b, b.armed ? `rgb(${ch.sp.rgb})` : b.charging ? "#ffd65a" : ch.band, shade);
     if (b.frozen > 0) { ctx.fillStyle = "rgba(190,240,255,.55)"; ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.rect(-60, -178, 140, 182); ctx.fill(); ctx.stroke(); }
-    if (b.tomatoT > 0) { E("rgba(230,40,30,.9)", 14, -150, 26, 18); E("rgba(255,90,70,.9)", 30, -135, 10, 7); E("rgba(255,90,70,.9)", -4, -138, 8, 6); }   // tomato splat
+    if (b.tomatoT > 0) {                                                   // tomato splat, with its green stem still on
+      E("rgba(230,40,30,.95)", 14, -150, 30, 21); E("rgba(255,120,100,.8)", 6, -156, 9, 5); E("rgba(255,90,70,.9)", 36, -132, 11, 8); E("rgba(255,90,70,.9)", -10, -136, 9, 6); E("rgba(255,90,70,.9)", 20, -122, 6, 9);
+      ctx.fillStyle = "#3f9a2c"; for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i - 2) * 0.55; E("#3f9a2c", 14 + Math.cos(a) * 9, -168 + Math.sin(a) * 5, 6, 3, a); }
+    }
     ctx.restore();
     if (stuck) { ctx.font = '700 14px "Noto Sans TC", sans-serif'; ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.fillText(b.stuckP.text, p.x, p.y - 40); }
     if (b.koT > 0) {                                                       // soul leaving the body
@@ -1264,7 +1276,9 @@
       ctx.globalAlpha = Math.min(1, 1.6 - msgT); ctx.font = `400 ${36 * U}px "Bungee", "Noto Sans TC", sans-serif`;
       ctx.fillStyle = ball.kind === "sp" ? `rgb(${charOf(ball.owner).sp.rgb})` : "#f6c453";
       ctx.lineWidth = 5; ctx.strokeStyle = "rgba(10,12,28,.85)"; ctx.lineJoin = "round"; ctx.strokeText(msg, W / 2, 190 - msgT * 10);
-      ctx.fillText(msg, W / 2, 190 - msgT * 10); ctx.globalAlpha = 1;
+      ctx.fillText(msg, W / 2, 190 - msgT * 10);
+      if (msgSub && msgSubOf === msg) { ctx.font = `700 ${15 * U}px "Noto Sans TC", sans-serif`; ctx.lineWidth = 4; ctx.strokeText(msgSub, W / 2, 190 + 30 * U - msgT * 10); ctx.fillStyle = "#fff"; ctx.fillText(msgSub, W / 2, 190 + 30 * U - msgT * 10); }
+      ctx.globalAlpha = 1;
     }
   }
   function drawDuck(x, y, flap) {
@@ -1292,10 +1306,15 @@
     ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
     ctx.clearRect(0, 0, W, H);
     if (shake > 0 && !reduceMotion) ctx.translate((Math.random() - 0.5) * 14 * shake, (Math.random() - 0.5) * 14 * shake);
+    const gray = gag.timeStopT > 0 ? "grayscale(1) contrast(1.1)" : "none";   // zap time stop: the world goes grey, only the stopper and the ball keep colour
+    const colour = (f) => () => { ctx.filter = "none"; f(); ctx.filter = gray; };
+    ctx.filter = gray;
     drawCourt(); drawLandingMark();
     // painter's order: far to near
-    const items = [{ y: seal.y, d: () => drawPlayer(seal) }, { y: NET_Y, d: drawNet }, { y: roo.y, d: () => drawPlayer(roo) }, { y: phase === "serve" ? (score.server === 0 ? roo.y - 0.01 : seal.y - 0.01) : ball.y - 0.01, d: drawBall }];
+    const who = (b) => gag.timeStopT > 0 && b.side === gag.timeStopBy ? colour(() => drawPlayer(b)) : () => drawPlayer(b);
+    const items = [{ y: seal.y, d: who(seal) }, { y: NET_Y, d: drawNet }, { y: roo.y, d: who(roo) }, { y: phase === "serve" ? (score.server === 0 ? roo.y - 0.01 : seal.y - 0.01) : ball.y - 0.01, d: colour(drawBall) }];
     items.sort((a, b) => b.y - a.y).forEach((i) => i.d());
+    ctx.filter = "none";
     drawParticles(); drawGags(); drawBubble(seal); drawBubble(roo);
     if (roo.zen && !reduceMotion) {                                         // zen: manga speed lines from the screen edges
       const t = performance.now() / 70; ctx.strokeStyle = "rgba(255,225,140,.35)"; ctx.lineWidth = 2;
@@ -1306,8 +1325,8 @@
     }
     drawHUD();
     if (gag.timeStopT > 0) {                                                // zap time stop: world goes grey-sepia
-      ctx.fillStyle = "rgba(90,70,140,.35)"; ctx.fillRect(0, 0, W, H);
-      ctx.font = '400 28px "Bungee", "Noto Sans TC", sans-serif'; ctx.textAlign = "center"; ctx.fillStyle = "#fff27a"; ctx.fillText("時間停止中…", W - 150, 150 + Math.sin(performance.now() / 80) * 3);
+      ctx.fillStyle = "rgba(90,70,140,.18)"; ctx.fillRect(0, 0, W, H);   // light tint: the grey filter does the heavy lifting
+      ctx.font = '400 28px "Bungee", "Noto Sans TC", sans-serif'; ctx.textAlign = "center"; ctx.fillStyle = "#fff27a"; ctx.fillText(gag.timeStopBy === 0 ? "世界只有我在動" : "時間停止中…", W - 150, 150 + Math.sin(performance.now() / 80) * 3);
     }
     if (flash > 0 && !reduceMotion) { ctx.fillStyle = `rgba(255,240,200,${flash})`; ctx.fillRect(0, 0, W, H); }
   }
@@ -1439,7 +1458,7 @@
     G = 12 * court().g;
     score.pts = [0, 0]; score.games = [0, 0]; score.server = 0; msg = ""; overlay.hidden = true; bestRally = 0; resolveOpp();
     for (const b of [roo, seal]) { b.meter = 0; b.armed = false; b.bubble = ""; b.st = 1; b.rage = false; b.lostRow = 0; b.zen = false; b.perfRow = 0; }
-    gag.yeets = [0, 0]; gag.kos = [0, 0]; gag.crowd = ""; gag.crowdT = 9; gag.duckT = 9; gag.pigeonT = -1; gag.timeStopT = 0; roo.zoneT = seal.zoneT = 0;
+    gag.yeets = [0, 0]; gag.kos = [0, 0]; gag.crowd = ""; gag.crowdT = 9; gag.duckT = 9; gag.netRip = null; gag.pigeonT = -1; gag.timeStopT = 0; roo.zoneT = seal.zoneT = 0;
     particles.length = 0; startServe();
   }
   function togglePause() {
