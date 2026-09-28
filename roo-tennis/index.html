@@ -174,7 +174,7 @@
                sp: { name: "冰原重砲！", speed: 36, rgb: "200,235,255", fx: "none", hurt: "好、好重…", stun: 1.3 }, trait: "heavy", tdesc: "熊掌全壘打：蓄滿 MAX 的球直接把人打飛；體力耗一半", stDrain: 0.5,
                draw: (c) => bodyBear(c) },
     hulk:    { name: "綠巨人", speed: 5.8, jump: 4.6, reach: 1.6, dive: 3.0, power: 1.35, meter: 1.0, band: "#3fa34d", tag: "力量大、速度慢",
-               sp: { name: "巨人震地砲！", speed: 34, rgb: "120,230,110", fx: "none", hurt: "地、地震了！", stun: 1.2 },
+               sp: { name: "綠巨人・天崩地裂砲！", speed: 40, rgb: "120,230,110", fx: "quake", hurt: "地、地震了！", stun: 1.6 },
                trait: "rage", tdesc: "暴怒：丟 1 分就變身，下一球球速開到最大", stDrain: 0.8,
                look: { sprite: "hulk", skin: "#6cbf4a" }, draw: (c, b) => bodyHuman(c, b) },
     cap:     { name: "帽子哥", speed: 6.6, jump: 5.2, reach: 1.45, dive: 3.0, power: 1.0, meter: 1.3, band: "#2d3340", tag: "均衡型",
@@ -209,14 +209,21 @@
     cap:     { name: "超・帽子哥完美旋風！", hint: "完美擊球放必殺", ok: (h) => h.quality === "perfect" },
     zap:     { name: "超・一億伏特！", hint: "完美擊球放必殺", ok: (h) => h.quality === "perfect" },
   };
-  const YEET_LINES = ["再見了您嘞～", "飛走囉～☆", "芭比Q了", "我好了", "Emotional Damage!", "這合理嗎？", "你沒事吧？", "物理學不存在了"];
+  // parody "tennis anime" moves: a perfect (non-smash, non-special) hit sometimes turns into one of these
+  const TECHS = {
+    snake:   { name: "繞網蛇球！", rgb: "190,120,255" },                   // swings wide around the net post and curls back in
+    zero:    { name: "零式削球！", rgb: "255,255,255" },                   // bounces backwards toward the net
+    swallow: { name: "燕回閃！", rgb: "140,255,200" },                    // does not bounce up: rolls away along the ground
+  };
+  const TECH_CHANCE = 0.35;
+  const YEET_LINES = ["你還差得遠呢", "再見了您嘞～", "飛走囉～☆", "芭比Q了", "我好了", "Emotional Damage!", "這合理嗎？", "你沒事吧？", "物理學不存在了"];
   const EV_LINES = {                                                     // [winner lines, loser lines]
     net: [["謝謝網子～", "網子站我這邊"], ["網子好愛我…", "這網有毒"]],
     out: [["出界囉～", "眼睛放亮點"], ["那是界內吧？！", "線審你過來"]],
     miss: [["追不到吧～", "腿不夠長喔"], ["等等我！", "剛剛誰按暫停"]],
     smashed: [["扣爆！", "殺！"], ["我的臉…", "剛剛那是什麼"]],
     whiff: [["揮空了哈哈", "空氣好打嗎？"], ["揮、揮空…", "拍子有洞"]],
-    yeet: [["全壘打！", "慢走不送～"], ["我在飛——", "媽我在天上"]],
+    yeet: [["全壘打！", "慢走不送～", "你還差得遠呢"], ["我在飛——", "媽我在天上"]],
   };
   let charId = "roo";
   try { const c = localStorage.getItem("roo-seal-char"); if (c && CHARS[c]) charId = c; } catch (e) {}
@@ -251,7 +258,7 @@
   const score = { pts: [0, 0], games: [0, 0], server: 0 };
   let phase = "intro", pausedFrom = "serve";
   // gag state: crowd mood, duck line judge, random events (pigeon / ball rain)
-  const gag = { crowd: "", crowdT: 9, duckT: 9, duckText: "", pigeonT: -1, pigeonDone: false, yeets: [0, 0], kos: [0, 0] };
+  const gag = { cracks: [], crowd: "", crowdT: 9, duckT: 9, duckText: "", pigeonT: -1, pigeonDone: false, yeets: [0, 0], kos: [0, 0] };
   const LOSER_AWARDS = ["最佳沙包獎", "人體風箏獎", "空氣揮拍冠軍", "觀眾最愛出糗獎", "地板親密接觸獎"];
   const WINNER_AWARDS = ["墨鏡戴好獎", "物理學破壞者", "網球界的恐怖份子", "今天的主角"];
   let lastHitter = 0, bounces = 0, rally = 0, bestRally = 0, msg = "", msgT = 9, serveT = 0, tossT = -1, shake = 0, freeze = 0, flash = 0;
@@ -357,7 +364,7 @@
     Object.assign(seal, { stuckT: 0, koT: 0, tomatoT: 0, x: srv === 1 ? sx : rx, y: srv === 1 ? L + 0.5 : L - 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
   }
   function startServe() {
-    placeForServe(); phase = "serve"; serveT = 0; tossT = -1; ball.live = false; ball.kind = "normal"; ball.trail = []; ball.netted = false; ball.heavy = false; ball.rage = false; ball.yeet = false;
+    gag.cracks = []; placeForServe(); phase = "serve"; serveT = 0; tossT = -1; ball.live = false; ball.kind = "normal"; ball.trail = []; ball.netted = false; ball.heavy = false; ball.rage = false; ball.yeet = false; ball.tech = null;
     lastHitter = score.server; bounces = 0; rally = 0;
   }
   // ev: "net" | "out" | "miss" (what ended the point); turned into "smashed" / "whiff" when that is the funnier truth
@@ -459,6 +466,7 @@
     if (ball.heavy) {                                                     // bear trait: receiving a heavy ball
       ball.heavy = false; ball.rage = false; b.stun = Math.max(b.stun, 0.35); say(b, "好、好重！"); shake = Math.max(shake, 0.5); burst(hp.x, hp.y, 16, "#dfefff", 200, 0.5);
     }
+    ball.tech = null;
     ball.kind = "normal"; ball.curve = 0; ball.spin = shot === "lob" ? "top" : shot === "drop" ? "slice" : "flat";
     const S = SHOTS[shot];
     let speed = S.speed, depth = S.depth(), power = S.power;
@@ -492,6 +500,12 @@
     const rageShot = charOf(b.side).trait === "rage" && b.rage && ball.kind === "normal";   // rage ball: top speed in the game
     if (rageShot) speed = Math.max(speed, 46);
     launch(tx, ty, speed, rageShot ? 0.2 : 0.45);
+    if (quality === "perfect" && shot !== "smash" && ball.kind === "normal" && Math.random() < (b.side === 0 ? TECH_CHANCE : TECH_CHANCE / 3)) {
+      ball.tech = pick(Object.keys(TECHS)); msg = TECHS[ball.tech].name; msgT = 0; color = `rgb(${TECHS[ball.tech].rgb})`; freeze = Math.max(freeze, 0.2);
+      if (ball.tech === "snake") {                                        // curve so strong the mid-flight bulge (curve*T^2/8) clears the post
+        const T = Math.abs((ty - ball.y) / ball.vy); ball.curve = -Math.sign(ball.x || aim || 1) * 8 * 7.5 / (T * T);
+      }
+    }
     if (ball.curve) ball.vx -= ball.curve * (Math.abs(ball.vy) > 0 ? (ty - ball.y) / ball.vy : 1) / 2;   // curve still lands on target
     lastHitter = b.side; bounces = 0; ball.netted = false; ball.t = 0; ball.power = power; ball.lastShot = shot;
     if (gag.pigeonT < 0 && ball.kind === "normal" && rally >= 3 && Math.random() < 0.05) { gag.pigeonT = 0; gag.pigeonDone = false; beep(500, 0.1, "triangle", 0.1, 0.5); }
@@ -540,7 +554,8 @@
     ball.trail.push(sp); if (ball.trail.length > (ball.kind === "normal" ? 8 : 16)) ball.trail.shift();
     if (ball.kind === "sp" && Math.random() < 0.9) particles.push({ x: sp.x, y: sp.y, vx: (Math.random() - 0.5) * 60, vy: -20 - Math.random() * 40, life: 0.4, max: 0.4, color: Math.random() < 0.5 ? `rgb(${charOf(ball.owner).sp.rgb})` : "#ffffff", grav: -60, r: 2 + Math.random() * 3 * sp.s });
     // net
-    if (ball.rage && (py - NET_Y) * (ball.y - NET_Y) <= 0 && ball.z < NET_H) {   // rage ball: rips through the net
+    if (ball.tech === "snake" && (py - NET_Y) * (ball.y - NET_Y) <= 0) { if (ball.z < NET_H) { msg = "繞過網柱了！"; msgT = 0; } }   // goes around, never into the net
+    else if (ball.rage && (py - NET_Y) * (ball.y - NET_Y) <= 0 && ball.z < NET_H) {   // rage ball: rips through the net
       const np = P(ball.x, NET_Y, ball.z); burst(np.x, np.y, 30, "#ffffff", 260, 0.6); shake = Math.max(shake, 0.6); msg = "網子破了！"; msgT = 0;
     }
     else if (!ball.netted && (py - NET_Y) * (ball.y - NET_Y) <= 0 && ball.z < NET_H) {
@@ -551,6 +566,14 @@
     if (ball.z <= 0 && ball.vz < 0) {
       const bo = BOUNCE[ball.spin || "flat"];
       ball.z = 0; ball.vz = -ball.vz * bo.kz; ball.vx *= bo.kxy; ball.vy *= bo.kxy;
+      if (ball.tech === "snake") { ball.curve = 0; ball.vx *= 0.3; }     // the curl ends at the bounce
+      if (ball.tech === "zero" && bounces === 0) { ball.vy = -ball.vy * 0.3; ball.vx *= 0.2; ball.vz = Math.min(ball.vz, 2.5); ball.curve = 0; }   // spins back to the net
+      if (ball.tech === "swallow") { ball.vz = 0.3; ball.vx *= 1.1; ball.vy *= 1.1; }                   // skids flat: effectively a second bounce at once
+      if (ball.kind === "sp" && ball.fx === "quake") {                   // hulk special: every bounce cracks the court and knocks down anyone near
+        shake = Math.max(shake, 1); freeze = Math.max(freeze, 0.12); gag.cracks.push({ x: ball.x, y: ball.y, r: 0.8 + Math.random() * 0.5, a: Math.random() * 6 });
+        beep(70, 0.5, "sawtooth", 0.22, -30); const cp = P(ball.x, ball.y); burst(cp.x, cp.y, 40, "#8a6a3a", 260, 0.7);
+        for (const v of [roo, seal]) if (v.side !== ball.owner && Math.hypot(v.x - ball.x, v.y - ball.y) < 6 && v.z <= 0) { v.stun = Math.max(v.stun, 1.4); v.koT = Math.max(v.koT, 1.2); say(v, "地震啦——"); }
+      }
       if (ball.kind === "sp" && ball.fx === "hop") { ball.vz *= 1.5; ball.vx += (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 3); }   // bounces off sideways
       beep(300, 0.05, "sine", 0.1); const bp = P(ball.x, ball.y); burst(bp.x, bp.y, 5, "rgba(230,240,255,.8)", 60 * bp.s, 0.3);
       const side = ball.y < NET_Y ? 0 : 1;
@@ -589,7 +612,7 @@
     }
   }
 
-  // seal trait: the ball is about to bounce twice right next to a seal -> it heads it back (weak lob), once per point
+  // seal trait: the ball is about to bounce twice right next to a seal -> it heads it back (weak lob), up to 3 times per point
   function noseSave(side) {
     const b = side === 0 ? roo : seal;
     if (charOf(side).trait !== "nose" || b.noseUsed >= 3 || b.stun > 0 || b.frozen > 0 || Math.hypot(ball.x - b.x, ball.y - b.y) > 2.2) return false;
@@ -771,6 +794,11 @@
     line(-HALF_W, 0, -HALF_W, L); line(HALF_W, 0, HALF_W, L);
     line(-HALF_W, NET_Y - SERVICE, HALF_W, NET_Y - SERVICE); line(-HALF_W, NET_Y + SERVICE, HALF_W, NET_Y + SERVICE);
     line(0, NET_Y - SERVICE, 0, NET_Y + SERVICE); line(0, 0, 0, 0.3); line(0, L, 0, L - 0.3);
+    ctx.strokeStyle = "#2a1c10"; ctx.lineWidth = 3;                       // hulk quake cracks
+    for (const c of gag.cracks) for (let k = 0; k < 6; k++) {
+      const a = c.a + k * 1.05, m = P(c.x + Math.cos(a) * c.r * 0.5, c.y + Math.sin(a) * c.r * 0.5), e = P(c.x + Math.cos(a + 0.3) * c.r * 1.6, c.y + Math.sin(a + 0.3) * c.r * 1.6), o = P(c.x, c.y);
+      ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(m.x, m.y); ctx.lineTo(e.x, e.y); ctx.stroke();
+    }
     if (phase === "serve") {                                              // the diagonal service box to aim at glows
       const far = score.server === 0, bx = -Math.sign(serveX()) * HALF_W, y0 = NET_Y, y1 = far ? NET_Y + SERVICE : NET_Y - SERVICE;
       const a = 0.16 + Math.sin(performance.now() / 200) * 0.06;
@@ -998,7 +1026,7 @@
     if (phase === "serve" && tossT >= 0 && Math.abs(tossT - TOSS_V / G) < APEX_OK) {   // perfect-serve window: ring around the ball
       const q = P(bx, by, bz); ctx.strokeStyle = "#ffd65a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(q.x, q.y, 22 * q.s, 0, Math.PI * 2); ctx.stroke();
     }
-    const n = ball.trail.length, tc = ball.kind === "sp" ? charOf(ball.owner).sp.rgb : SPIN_RGB[ball.spin || "flat"];
+    const n = ball.trail.length, tc = ball.kind === "sp" ? charOf(ball.owner).sp.rgb : ball.tech ? TECHS[ball.tech].rgb : SPIN_RGB[ball.spin || "flat"];
     if (phase === "rally") {
       ball.trail.forEach((t, i) => { ctx.fillStyle = `rgba(${tc},${(i / n) * (0.4 + ball.power * 0.5)})`; ctx.beginPath(); ctx.arc(t.x, t.y, (7 + ball.power * 5) * t.s * (i / n), 0, Math.PI * 2); ctx.fill(); });
       if (ball.power > 0.5 && n > 2) {                                     // speed lines on hard-hit balls
@@ -1006,7 +1034,7 @@
         for (const off of [-6, 0, 6]) { ctx.beginPath(); ctx.moveTo(ball.trail[0].x, ball.trail[0].y + off); ctx.lineTo(ball.trail[n - 1].x, ball.trail[n - 1].y + off * 0.3); ctx.stroke(); }
       }
     }
-    const p = P(bx, by, bz), r = Math.max(4, 9.5 * p.s);
+    const p = P(bx, by, bz), r = Math.max(4, 9.5 * p.s) * (ball.kind === "sp" && ball.fx === "quake" ? 3 : 1);   // hulk special: boulder-sized ball
     const q = P(bx + ball.vx * 0.02, by + ball.vy * 0.02, bz + ball.vz * 0.02), ang = Math.atan2(q.y - p.y, q.x - p.x);
     const stretch = phase === "rally" ? (ball.squash > 0 ? 1.8 : 1 + Math.min(0.5, ball.power * 0.5)) : 1;
     if (ball.kind === "sp") { const g = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, r * 3); g.addColorStop(0, `rgba(${tc},.9)`); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r * 3, 0, Math.PI * 2); ctx.fill(); }
