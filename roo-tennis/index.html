@@ -143,6 +143,7 @@
           <li>高球會出現紅色<b>扣殺點</b>：站進去，看到「跳！」就跳，空中按「打」＝扣殺。</li>
           <li><b>發球</b>：按一次拋球、最高點再按；按住 ↑ 上旋、↓ 切球。左右區每分輪流。</li>
           <li>集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。</li>
+          <li>對方必殺飛來時打出<b>完美擊球</b>或<b>蓄滿 MAX</b>＝<b>退貨</b>，原路打回去（可以一直互懟，越來越快）。</li>
           <li><b>體力</b>越少跑越慢，站著會回。P 暫停。</li>
         </ul>
       </details>
@@ -176,9 +177,9 @@
   const TOSS_V = 6, APEX_OK = 0.08;     // serve toss speed; perfect-serve window (s) around the toss apex
   const K = 78, Y0 = -3.2, YSPAN = L + 6.4, SCR_NEAR = 562, SCR_FAR = 152, FAR_SHRINK = 0.45;
   const LEVELS = {
-    easy:   { speed: 4.2, miss: 0.22, err: 1.4, meter: 0.1 },
-    normal: { speed: 5.2, miss: 0.1,  err: 0.8, meter: 0.13 },
-    hard:   { speed: 6.2, miss: 0.03, err: 0.35, meter: 0.16 },
+    easy:   { speed: 4.2, miss: 0.22, err: 1.4, meter: 0.1, counter: 0.08 },
+    normal: { speed: 5.2, miss: 0.1,  err: 0.8, meter: 0.13, counter: 0.15 },
+    hard:   { speed: 6.2, miss: 0.03, err: 0.35, meter: 0.16, counter: 0.25 },
   };
   // courts: bounce height (kz) / bounce speed kept (kxy) multipliers, gravity multiplier, ice = players slide (momentum), colours
   const COURTS = {
@@ -256,6 +257,10 @@
     swallow: { name: "燕回閃！", rgb: "140,255,200" },                    // does not bounce up: rolls away along the ground
   };
   const TECH_CHANCE = 0.35;
+  // counter ("退貨"): receive the other side's special with a perfect hit or a MAX charge -> it flies back as YOUR special,
+  // COUNTER_SPEEDUP faster each exchange (capped). The AI counters with LEVELS[level].counter. Supers (ball.yeet) can't be countered.
+  const COUNTER_SPEEDUP = 1.15, COUNTER_MAX_SPEED = 50;
+  const COUNTER_LINES = ["還給你！", "退貨！", "無駄無駄無駄！", "反射！", "這招我收下了", "原封不動奉還"];
   const YEET_LINES = ["你還差得遠呢", "再見了您嘞～", "飛走囉～☆", "芭比Q了", "我好了", "Emotional Damage!", "這合理嗎？", "你沒事吧？", "物理學不存在了"];
   const EV_LINES = {                                                     // [winner lines, loser lines]
     net: [["謝謝網子～", "網子站我這邊"], ["網子好愛我…", "這網有毒"]],
@@ -354,7 +359,7 @@
   }
   // everything that makes a hit feel heavy: hit-stop, shake, shockwave, radial streaks, squash, sound
   function impact(sx, sy, power, color = "#fff3c4") {
-    freeze = Math.max(freeze, 0.045 + power * 0.085); buzz(Math.round(12 + power * 45));
+    freeze = Math.max(freeze, 0.045 + power * 0.085);
     shake = Math.max(shake, 0.12 + power * 0.35);
     flash = Math.max(flash, power * 0.18);
     rings.push({ x: sx, y: sy, r: 8, max: 60 + power * 90, life: 0.35, t: 0, color });
@@ -409,14 +414,14 @@
     Object.assign(seal, { stuckT: 0, koT: 0, tomatoT: 0, x: srv === 1 ? sx : rx, y: srv === 1 ? L + 0.5 : L - 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
   }
   function startServe() {
-    gag.cracks = []; placeForServe(); phase = "serve"; serveT = 0; tossT = -1; ball.live = false; ball.kind = "normal"; ball.trail = []; ball.netted = false; ball.heavy = false; ball.rage = false; ball.yeet = false; ball.tech = null;
+    gag.cracks = []; placeForServe(); phase = "serve"; serveT = 0; tossT = -1; ball.live = false; ball.kind = "normal"; ball.trail = []; ball.netted = false; ball.heavy = false; ball.rage = false; ball.yeet = false; ball.tech = null; ball.swaps = 0;
     lastHitter = score.server; bounces = 0; rally = 0;
   }
   // ev: "net" | "out" | "miss" (what ended the point); turned into "smashed" / "whiff" when that is the funnier truth
   function awardPoint(winner, why, ev = "miss") {
     if (phase !== "rally") return;
     phase = "point"; msg = why; msgT = 0;
-    if (ball.kind === "sp" && ball.owner === winner) msg = winner === 0 ? "必殺得分！" : charOf(1).sp.name.replace("！", "") + "得分";
+    if (ball.kind === "sp" && ball.owner === winner) msg = ball.swaps ? (winner === 0 ? "退貨成功！" : "被退貨了…") : winner === 0 ? "必殺得分！" : charOf(1).sp.name.replace("！", "") + "得分";
     const W_ = winner === 0 ? roo : seal, Lz = winner === 0 ? seal : roo;
     if (W_.rage) { W_.rage = false; say(W_, "呼…冷靜下來了"); }             // rage lasts until the hulk wins a point
     W_.lostRow = 0; Lz.lostRow = (Lz.lostRow || 0) + 1;                   // rage trait: losing a point
@@ -482,6 +487,24 @@
     volley: { speed: 24, depth: () => 4 + Math.random() * 3, aimK: 3.6, power: 0.45, label: "截擊！" },
     smash:  { speed: 32, depth: () => 3 + Math.random() * 3, aimK: 3.4, power: 0.85, label: "扣殺！" },
   };
+  // counter: the special keeps its flight twist (fx) but changes owner — colour, hurt effect and the point now belong to the returner
+  function counterSpecial(b, hp, aim) {
+    ball.swaps = (ball.swaps || 0) + 1; ball.owner = b.side; ball.curve = 0; ball.tech = null;
+    const speed = Math.min(COUNTER_MAX_SPEED, (ball.spSpeed || 30) * COUNTER_SPEEDUP); ball.spSpeed = speed;
+    const tx = clamp(aim * 3.3 || (Math.random() < 0.5 ? -3 : 3), -3.6, 3.6), ty = b.side === 0 ? L - 2.5 : 2.5;
+    if (ball.fx === "curve") ball.curve = -tx * 3.2;
+    launch(tx, ty, speed);
+    if (ball.curve) ball.vx -= ball.curve * ((ty - ball.y) / ball.vy) / 2;
+    lastHitter = b.side; bounces = 0; ball.netted = false; ball.t = 0; ball.power = 1; ball.lastShot = "counter"; rally++;
+    const col = `rgb(${charOf(b.side).sp.rgb})`, n = ball.swaps;
+    msg = n === 1 ? "退貨！" : n === 2 ? "再退貨！！" : `必殺互懟 ×${n}！`; msgT = 0; say(b, pick(COUNTER_LINES));
+    b.swing = 1; b.swingT = 0; b.charging = false; b.chargeT = 0;
+    impact(hp.x, hp.y, 1, col); freeze = Math.max(freeze, 0.22 + 0.06 * Math.min(n, 4)); flash = Math.max(flash, 0.45); shake = Math.max(shake, 0.8 + 0.1 * n);
+    rings.push({ x: hp.x, y: hp.y, r: 14, max: 220, life: 0.5, t: 0, color: col }); burst(hp.x, hp.y, 40, col, 280, 0.7, 60);
+    beep(880, 0.12, "square", 0.12); setTimeout(() => beep(1320, 0.18, "square", 0.12, 1.5), 90);
+    if (n >= 3) { gag.crowd = "wild"; gag.crowdT = 0; }
+    if (b.side === 0) buzz([30, 30, 60]);
+  }
   // quality: "good" | "perfect" | "dive" (smash: "perfect" = hit at the top of the jump); charge: 0..1; aim: -1..1 left/right
   function hitBall(b, shot, quality, aim, charge = 0) {
     rally++; bestRally = Math.max(bestRally, rally);
@@ -490,18 +513,19 @@
     if (inSpd > ST_HIT_FROM) b.st = Math.max(0, b.st - (inSpd - ST_HIT_FROM) * ST_HIT * charOf(b.side).stDrain * (b.rage ? 2 : 1));
     if (ball.yeet) {                                                      // bear MAX / super special: the receiver is launched off the court
       ball.yeet = false; b.stun = 2; b.spinT = 1.8; b.z = 0.01; b.vz = 11; b.vx = (Math.random() - 0.5) * 6; b.vy = b.side === 0 ? -7 : 7;
-      b.swing = 1; rageRoar(hp); freeze = 0.3; shake = 1; flash = 0.5; say(b, "啊啊啊——"); buzz([80, 40, 160]);
+      b.swing = 1; rageRoar(hp); freeze = 0.3; shake = 1; flash = 0.5; say(b, "啊啊啊——"); if (b.side === 0) buzz([80, 40, 160]);
       gag.yeets[1 - b.side]++; stickSomewhere(b);
       ball.kind = "normal"; awardPoint(1 - b.side, pick(YEET_LINES), "yeet"); return;
     }
     // receiving a power shot: knocked back, weak floater
     if (ball.kind === "sp" && ball.owner !== b.side) {
+      if (b.side === 0 ? quality === "perfect" || charge >= 0.95 : Math.random() < LEVELS[level].counter) { counterSpecial(b, hp, aim); return; }
       const sp = charOf(ball.owner).sp, col = `rgb(${sp.rgb})`;
       if (sp.freeze) b.frozen = 0.9;                                      // ice specials freeze; the rest knock you back, dizzy
       else { b.stun = sp.stun || 0.9; b.y = b.side === 1 ? Math.min(L + 2, b.y + 2.2) : Math.max(-2.8, b.y - 2.2); }
       say(b, sp.hurt); burst(hp.x, hp.y, 30, col, 220, 0.6);
       if (sp.racket) { b.noRacketT = sp.stun; particles.push({ x: hp.x, y: hp.y, vx: (Math.random() - 0.5) * 300, vy: -520, life: 1.2, max: 1.2, color: "#c9a36a", grav: 700, r: 9 }); }
-      ball.kind = "normal"; ball.curve = 0; impact(hp.x, hp.y, 0.7, col);
+      ball.kind = "normal"; ball.curve = 0; impact(hp.x, hp.y, 0.7, col); if (b.side === 0) buzz(70);
       launch((Math.random() - 0.5) * 2, b.side === 0 ? NET_Y + 3 : NET_Y - 3.5, 9);
       lastHitter = b.side; bounces = 0; ball.netted = false; b.swing = 1; ball.power = 0;
       return;
@@ -533,7 +557,7 @@
       b.armed = false; b.meter = 0; power = 1;
       const sp = charOf(b.side).sp;                                       // kind "sp" + owner: whose special, flight twist in ball.fx
       const sup = SUPERS[b.side === 0 ? charId : oppId], isSuper = sup.ok({ b, shot, quality, charge });
-      ball.kind = "sp"; ball.owner = b.side; ball.fx = sp.fx; speed = sp.speed; ty = b.side === 0 ? L - 2.5 : 2.5;
+      ball.kind = "sp"; ball.owner = b.side; ball.fx = sp.fx; ball.swaps = 0; speed = sp.speed; ty = b.side === 0 ? L - 2.5 : 2.5;
       tx = clamp(aim * 3.3 || (Math.random() < 0.5 ? -3 : 3), -3.6, 3.6); if (sp.fx === "curve") ball.curve = -tx * 3.2;
       msg = sp.name; color = `rgb(${sp.rgb})`; b.bubble = "";   // the big text is the call-out; no bubble on top of it beep(sp.freeze ? 1200 : 180, 0.5, sp.freeze ? "sine" : "sawtooth", 0.18, sp.freeze ? 0.3 : 4);
       msgT = 0; burst(hp.x, hp.y, 40, color, 260, 0.7, 120);
@@ -549,6 +573,7 @@
       b.meter = Math.min(1, b.meter + LEVELS[level].meter * opp().meter); power = 0.2;
     }
     if (b.side === 0 && ball.kind === "normal" && Math.abs(b.vx) > 1) ball.curve = b.vx * 0.6;   // running sidespin
+    ball.spSpeed = speed;                                                  // the counter speeds up from here
     const rageShot = charOf(b.side).trait === "rage" && b.rage && ball.kind === "normal";   // rage ball: top speed in the game
     if (rageShot) speed = Math.max(speed, 46);
     launch(tx, ty, speed, rageShot ? 0.2 : 0.45);
@@ -568,7 +593,7 @@
       foe.stun = Math.max(foe.stun, 0.9); say(foe, "滋滋滋滋…"); const fp = P(foe.x, foe.y, 1); burst(fp.x, fp.y, 18, "#fff27a", 180, 0.4, 0);
     }
     b.swing = 1; b.swingT = 0; b.charging = false; b.chargeT = 0;
-    impact(hp.x, hp.y, power, color);
+    impact(hp.x, hp.y, power, color); if (b.side === 0) buzz(Math.round(12 + power * 45));   // phone haptics: only your own racket
     if (quality === "perfect" && shot !== "smash") {                      // perfect: longer hit-stop, flash, second ring, bright chime
       freeze = Math.max(freeze, 0.13); flash = Math.max(flash, 0.3);
       rings.push({ x: hp.x, y: hp.y, r: 14, max: 170, life: 0.45, t: 0, color });
@@ -590,7 +615,7 @@
     bounces = 0; ball.netted = false; b.swing = 1; rally = 1; ball.power = Q[1];
     ball.spin = spin; ball.curve = 0;
     if (Q[2]) { msg = Q[2]; msgT = 0; } else if (spin !== "flat") { msg = spin === "top" ? "上旋發球！" : "切球發球！"; msgT = 0; }
-    const sp = P(ball.x, ball.y, ball.z); impact(sp.x, sp.y, Q[1]);
+    const sp = P(ball.x, ball.y, ball.z); impact(sp.x, sp.y, Q[1]); if (score.server === 0) buzz(Math.round(12 + Q[1] * 45));
     if (charOf(b.side).trait === "rage" && b.rage) {                     // raging hulk serves at top speed, through the net
       launch(-Math.sign(b.x || 1) * 2.1 + aim * 1.4 * dir, NET_Y + dir * (SERVICE - 1.2), 46, 0.2);
       ball.rage = ball.heavy = true; ball.power = 1; msg = "暴怒發球！"; msgT = 0; freeze = 0.25; shake = 0.9; rageRoar(sp);
@@ -1169,7 +1194,10 @@
     if (roo.armed && phase !== "over") { ctx.fillStyle = `rgb(${me().sp.rgb})`; ctx.fillText("下一球自動必殺！", W / 2 - 135, 102); }
     ctx.restore(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (phase === "serve" && score.server === 0) { ctx.font = `700 ${18 * U}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#f3f1ea"; ctx.fillText(tossT < 0 ? (touch ? "按「打」拋球" : "按「打」拋球（←→ 方向、↑ 上旋、↓ 切球）") : "球在最高點時再按一次！", W / 2, touch ? H - 26 : 132); }   // phones: under the near baseline, clear of the far player
-    if (phase === "rally" && rally >= 5) { ctx.font = `400 ${16 * U}px "Bungee", "Noto Sans TC", sans-serif`; ctx.fillStyle = "rgba(246,196,83,.9)"; ctx.fillText(`連續 ${rally} 拍`, W / 2, 110 + 22 * U); }
+    if (phase === "rally" && ball.kind === "sp" && ball.owner === 1 && !ball.yeet && lastHitter === 1) {   // teach the counter when it matters
+      ctx.font = `700 ${16 * U}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#8ff4ff";   // bottom edge: the top is busy with the caster's bubble and the special's name
+      ctx.lineWidth = 4; ctx.strokeStyle = "rgba(10,12,28,.85)"; ctx.lineJoin = "round"; ctx.strokeText("完美擊球（NICE）或蓄滿 MAX ＝退貨！", W / 2, H - 26); ctx.fillText("完美擊球（NICE）或蓄滿 MAX ＝退貨！", W / 2, H - 26);
+    } else if (phase === "rally" && rally >= 5) { ctx.font = `400 ${16 * U}px "Bungee", "Noto Sans TC", sans-serif`; ctx.fillStyle = "rgba(246,196,83,.9)"; ctx.fillText(`連續 ${rally} 拍`, W / 2, 110 + 22 * U); }
     if (msg && msgT < 1.4) {
       ctx.globalAlpha = Math.min(1, 1.6 - msgT); ctx.font = `400 ${36 * U}px "Bungee", "Noto Sans TC", sans-serif`;
       ctx.fillStyle = ball.kind === "sp" ? `rgb(${charOf(ball.owner).sp.rgb})` : "#f6c453";
