@@ -40,6 +40,7 @@
     box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; opacity: 0; transform: scale(.6) rotate(-6deg); transition: opacity .15s, transform .2s; }
   #clip.on { opacity: 1; transform: scale(1) rotate(-3deg); z-index: 7; }   /* above the result screen (win clip) and the touch controls */
   #clip.big { width: 30%; border-color: #ff5a3c; }
+  #clip.over, body.touch #clip.over { top: auto; bottom: 8px; width: 22%; }
   #intro { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; z-index: 5; cursor: pointer; }
   .overlay.welcome:not([data-mode="text"]) { background: linear-gradient(rgba(12,14,30,.15), rgba(12,14,30,.75) 45%), var(--welcome) center / cover; }
   .stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden; background: #1b2a55; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -95,6 +96,8 @@
   body.touch #pausebtn[hidden] { display: none; }
   body.touch .overlay { position: fixed; place-content: start center; grid-auto-rows: max-content; padding-top: 14px; }   /* menus use the whole screen, not just the (small, in portrait) stage */
   body.touch .overlay .opts { justify-content: center; }
+  body.touch .overlay .play { position: sticky; bottom: 6px; z-index: 1; box-shadow: 0 4px 18px rgba(0,0,0,.5); }   /* 開始比賽 never scrolls out of reach */
+  @media (orientation: landscape) { body.touch .overlay { gap: 6px; } body.touch .overlay h2 { font-size: 26px; } }
   body.touch .chars { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; max-width: 100%; scrollbar-width: none;
     -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent); padding-right: 28px; }   /* fade = "more to the right" */
   body.touch #clip { width: 18%; top: 8px; right: 8px; } body.touch #clip.big { width: 24%; }   /* phones: the clip must not hide the ball */
@@ -153,7 +156,7 @@
           <li>集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。</li>
           <li>連續 3 次<b>完美擊球</b>＝<b>無我境界</b>：完美區變大、集氣加倍，丟分才解除。</li>
           <li>對拍越長球越快；贏下 10 拍以上的長對拍＝<b>必殺直接集滿</b>。</li>
-          <li>對方必殺飛來時打出<b>完美擊球</b>或<b>蓄滿 MAX</b>＝<b>退貨</b>，原路打回去（可以一直互懟，越來越快）。</li>
+          <li>對方必殺飛來時<b>提早按「打」蓄力</b>或打出<b>完美擊球</b>＝<b>退貨</b>，原路打回去（可以一直互懟，越來越快）。</li>
           <li><b>體力</b>越少跑越慢，站著會回。P 暫停。</li>
         </ul>
       </details>
@@ -273,7 +276,7 @@
   const TECH_CHANCE = 0.35;
   // counter ("退貨"): receive the other side's special with a perfect hit or a MAX charge -> it flies back as YOUR special,
   // COUNTER_SPEEDUP faster each exchange (capped). The AI counters with LEVELS[level].counter. Supers (ball.yeet) can't be countered.
-  const COUNTER_SPEEDUP = 1.15, COUNTER_MAX_SPEED = 50;
+  const COUNTER_SPEEDUP = 1.15, COUNTER_MAX_SPEED = 50, COUNTER_CHARGE = 0.5;   // COUNTER_CHARGE: half a charge is enough (a full MAX rarely fits before a special arrives)
   // zen ("無我境界"): ZEN_ROW perfect hits in a row (player only) -> golden aura until you lose a point:
   // perfect zone x ZEN_ZONE, meter gain x ZEN_METER, shot speed x ZEN_SPEED
   // long rallies heat up: from HEAT_FROM strokes each normal shot is HEAT_STEP faster (max HEAT_MAX); milestones get a shout-out;
@@ -281,7 +284,9 @@
   const HEAT_FROM = 8, HEAT_STEP = 0.02, HEAT_MAX = 0.25, HEAT_PRIZE = 10;
   const HEAT_CALLS = { 8: "熱血對拍！", 12: "史詩級對拍！！", 16: "這是在打網球嗎？！", 20: "觀眾都睡著又醒來了" };
   const ZEN_ROW = 3, ZEN_ZONE = 2, ZEN_METER = 2, ZEN_SPEED = 1.1;
-  const perfZone = () => PERFECT_D * (me().trait === "precise" ? PRECISE_K : 1) * (roo.zen ? ZEN_ZONE : 1);
+  // phones: touch latency makes the 0.6 m window (~24 ms at 25 m/s) unreachable -> TOUCH_PERFECT_K wider; zone ring drawn from the same value
+  const TOUCH_PERFECT_K = 1.5;
+  const perfZone = () => PERFECT_D * (touch ? TOUCH_PERFECT_K : 1) * (me().trait === "precise" ? PRECISE_K : 1) * (roo.zen ? ZEN_ZONE : 1);
   const COUNTER_LINES = ["還給你！", "退貨！", "無駄無駄無駄！", "反射！", "這招我收下了", "原封不動奉還", "本商品不接受退貨", "七天鑑賞期！", "原價奉還，發票不用"];
   const YEET_LINES = ["你還差得遠呢", "再見了您嘞～", "飛走囉～☆", "芭比Q了", "我好了", "Emotional Damage!", "這合理嗎？", "你沒事吧？", "物理學不存在了"];
   const EV_LINES = {                                                     // [winner lines, loser lines]
@@ -396,11 +401,14 @@
   // special move: short meme clip pops up in the corner (super = bigger, red frame). Clips are base64 at file end (window.CLIP_SRC).
   const clipEl = document.getElementById("clip");
   clipEl.onended = () => clipEl.classList.remove("on");
+  let clipSeq = 0;
   function playClip(id, big) {
     const src = window.CLIP_SRC && window.CLIP_SRC[id]; if (!src) return;
+    const seq = ++clipSeq;
     if (clipEl.dataset.id !== id) { clipEl.src = src; clipEl.dataset.id = id; }
     clipEl.classList.toggle("big", !!big); clipEl.classList.add("on"); clipEl.currentTime = 0;
-    clipEl.play().catch(() => { if (clipEl.dataset.id === id) clipEl.classList.remove("on"); });   // a clip interrupted by the next one must not hide the next one
+    clipEl.classList.remove("over");
+    clipEl.play().catch(() => { if (seq === clipSeq) clipEl.classList.remove("on"); });   // a clip interrupted by a newer one must not hide the newer one
   }
   // yeeted player ends up stuck on the scoreboard, in the net or head-first in the stands (drawn there until the next serve)
   function stickSomewhere(b) {
@@ -433,8 +441,8 @@
     const srv = score.server, sx = serveX(), rx = -sx * 1.15;
     const newGame = score.pts[0] + score.pts[1] === 0;                     // stamina: a little back per point, full at each new game
     for (const b of [roo, seal]) { b.st = newGame ? 1 : Math.min(1, b.st + ST_POINT); b.noseUsed = 0; b.dj = 0; }
-    Object.assign(roo, { stuckT: 0, koT: 0, tomatoT: 0, x: srv === 0 ? sx : rx, y: srv === 0 ? -0.5 : 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
-    Object.assign(seal, { stuckT: 0, koT: 0, tomatoT: 0, x: srv === 1 ? sx : rx, y: srv === 1 ? L + 0.5 : L - 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
+    Object.assign(roo, { stuckP: null, stuckT: 0, koT: 0, tomatoT: 0, x: srv === 0 ? sx : rx, y: srv === 0 ? -0.5 : 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
+    Object.assign(seal, { stuckP: null, stuckT: 0, koT: 0, tomatoT: 0, x: srv === 1 ? sx : rx, y: srv === 1 ? L + 0.5 : L - 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
   }
   // side that wins the match with the next point (or -1)
   function matchPointSide() {
@@ -493,8 +501,9 @@
         setTimeout(() => {                                                  // skip if a new match / the menu started meanwhile
           if (phase !== "over") return;
           const lose = 1 - winner, award = `${nameOf(winner)}獲頒「${pick(WINNER_AWARDS)}」，${nameOf(lose)}獲頒「${pick(LOSER_AWARDS)}」`;
+          const again = winner === 0 ? pick(["再來一場", "再虐一場", "乘勝追擊"]) : pick(["不服！再來", "我要報仇", "剛剛不算"]);
           showOverlay(winner === 0 ? me().name + "贏了！" : opp().name + "贏了…",
-            `局數 ${score.games[0]} : ${score.games[1]}　最長連續 ${bestRally} 拍\n${award}\n打飛人 ${gag.yeets[0]} : ${gag.yeets[1]}　體力耗盡倒地 ${gag.kos[0]} : ${gag.kos[1]}`, "再來一場");
+            `局數 ${score.games[0]} : ${score.games[1]}　最長連續 ${bestRally} 拍\n${award}\n打飛人 ${gag.yeets[0]} : ${gag.yeets[1]}　體力耗盡倒地 ${gag.kos[0]} : ${gag.kos[1]}`, again);
         }, 900);
       }
     }
@@ -570,7 +579,7 @@
     }
     // receiving a power shot: knocked back, weak floater
     if (ball.kind === "sp" && ball.owner !== b.side) {
-      if (b.side === 0 ? quality === "perfect" || charge >= 0.95 : Math.random() < LEVELS[level].counter) { counterSpecial(b, hp, aim); if (b.side === 0) zenStreak(b, quality, hp); return; }
+      if (b.side === 0 ? quality === "perfect" || charge >= COUNTER_CHARGE : Math.random() < LEVELS[level].counter) { counterSpecial(b, hp, aim); if (b.side === 0) zenStreak(b, quality, hp); return; }
       const sp = charOf(ball.owner).sp, col = `rgb(${sp.rgb})`;
       if (sp.freeze) b.frozen = 0.9;                                      // ice specials freeze; the rest knock you back, dizzy
       else { b.stun = sp.stun || 0.9; b.y = b.side === 1 ? Math.min(L + 2, b.y + 2.2) : Math.max(-2.8, b.y - 2.2); }
@@ -853,7 +862,9 @@
   }
 
   // ---------- input actions
+  let overShownAt = 0;
   function swing() {
+    if (phase === "over" && (overlay.hidden || performance.now() - overShownAt < 1200)) return;   // mashing 打 must not skip the result screen
     if (phase === "intro" || phase === "over") { startMatch(); return; }
     if (phase === "paused") { togglePause(); return; }
     if (phase === "point") { msgT = Math.max(msgT, 1.5); return; }        // skip the blooper / taunt pause
@@ -880,7 +891,7 @@
     else { roo.swingT = 0.2; roo.swingCd = 0.35; }
   }
   function jump() {
-    if (phase === "intro" || phase === "over") { startMatch(); return; }
+    if (phase === "intro" || phase === "over") { swing(); return; }         // same start / result-screen guard as 打
     if (phase !== "rally" || roo.diveT > 0 || roo.recover > 0 || roo.frozen > 0 || roo.stun > 0) return;
     if (roo.z > 0) {                                                      // kangaroo trait: one more jump in the air
       if (me().trait !== "dj" || roo.dj >= 2) return;
@@ -1037,6 +1048,12 @@
     }
     if (shade && !(b.noRacketT > 0)) drawRacket(b, b.armed ? `rgb(${ch.sp.rgb})` : b.charging ? "#ffd65a" : ch.band, shade);
     if (b.frozen > 0) { ctx.fillStyle = "rgba(190,240,255,.55)"; ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.rect(-60, -178, 140, 182); ctx.fill(); ctx.stroke(); }
+    if (b.charging && ch.trait === "heavy") {                              // bear charging = eating lunch: open bento above the head
+      ctx.save(); ctx.translate(10, -200 - Math.abs(Math.sin(performance.now() / 120)) * 4);
+      ctx.fillStyle = "#b8322a"; ctx.fillRect(-26, -12, 52, 24); ctx.fillStyle = "#fff8ec"; ctx.fillRect(-22, -9, 26, 18);
+      E("#e9a23b", 13, 0, 7, 6); E("#6fbf4a", 13, -6, 5, 3); E("#e2483a", -12, -2, 4, 4);   // egg, greens, plum on the rice
+      ctx.restore();
+    }
     if (b.tomatoT > 0) {                                                   // tomato splat, with its green stem still on
       E("rgba(230,40,30,.95)", 14, -150, 30, 21); E("rgba(255,120,100,.8)", 6, -156, 9, 5); E("rgba(255,90,70,.9)", 36, -132, 11, 8); E("rgba(255,90,70,.9)", -10, -136, 9, 6); E("rgba(255,90,70,.9)", 20, -122, 6, 9);
       ctx.fillStyle = "#3f9a2c"; for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i - 2) * 0.55; E("#3f9a2c", 14 + Math.cos(a) * 9, -168 + Math.sin(a) * 5, 6, 3, a); }
@@ -1270,7 +1287,7 @@
     if (phase === "serve" && score.server === 0) { ctx.font = `700 ${18 * U}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#f3f1ea"; ctx.fillText(tossT < 0 ? (touch ? "按「打」拋球" : "按「打」拋球（←→ 方向、↑ 上旋、↓ 切球）") : "球在最高點時再按一次！", W / 2, H - 26); }   // under the near baseline, clear of the far player and the big texts
     if (counterChance()) {                                                // teach the counter when it matters
       ctx.font = `700 ${16 * U}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#8ff4ff";   // bottom edge: the top is busy with the caster's bubble and the special's name
-      ctx.lineWidth = 4; ctx.strokeStyle = "rgba(10,12,28,.85)"; ctx.lineJoin = "round"; ctx.strokeText("完美擊球（NICE）或蓄滿 MAX ＝退貨！", W / 2, H - 26); ctx.fillText("完美擊球（NICE）或蓄滿 MAX ＝退貨！", W / 2, H - 26);
+      ctx.lineWidth = 4; ctx.strokeStyle = "rgba(10,12,28,.85)"; ctx.lineJoin = "round"; ctx.strokeText("提早按「打」蓄力或完美擊球＝退貨！", W / 2, H - 26); ctx.fillText("提早按「打」蓄力或完美擊球＝退貨！", W / 2, H - 26);
     } else if (phase === "rally" && rally >= 5) { ctx.font = `400 ${16 * U}px "Bungee", "Noto Sans TC", sans-serif`; ctx.fillStyle = "rgba(246,196,83,.9)"; ctx.fillText(`連續 ${rally} 拍`, W / 2, 110 + 22 * U); }
     if (msg && msgT < 1.4) {
       ctx.globalAlpha = Math.min(1, 1.6 - msgT); ctx.font = `400 ${36 * U}px "Bungee", "Noto Sans TC", sans-serif`;
@@ -1326,7 +1343,7 @@
     drawHUD();
     if (gag.timeStopT > 0) {                                                // zap time stop: world goes grey-sepia
       ctx.fillStyle = "rgba(90,70,140,.18)"; ctx.fillRect(0, 0, W, H);   // light tint: the grey filter does the heavy lifting
-      ctx.font = '400 28px "Bungee", "Noto Sans TC", sans-serif'; ctx.textAlign = "center"; ctx.fillStyle = "#fff27a"; ctx.fillText(gag.timeStopBy === 0 ? "世界只有我在動" : "時間停止中…", W - 150, 150 + Math.sin(performance.now() / 80) * 3);
+      ctx.font = '400 28px "Bungee", "Noto Sans TC", sans-serif'; ctx.textAlign = "center"; ctx.fillStyle = "#fff27a"; ctx.fillText(gag.timeStopBy === 0 ? "世界只有我在動" : "時間停止中…", 170, 150 + Math.sin(performance.now() / 80) * 3);
     }
     if (flash > 0 && !reduceMotion) { ctx.fillStyle = `rgba(255,240,200,${flash})`; ctx.fillRect(0, 0, W, H); }
   }
@@ -1395,7 +1412,7 @@
   });
   // floating stick: the base appears where the thumb lands; the drag direction (8 ways, 45° sectors) drives the same keys as the arrows,
   // so shot choice (↑ lob / ↓ drop / ←→ aim) works exactly like the keyboard. STICK_DEAD: px of drag before it counts; STICK_MAX: knob travel
-  const STICK_DEAD = 14, STICK_MAX = 52;
+  const STICK_DEAD = 10, STICK_MAX = 44;
   const stickEl = document.getElementById("stick"), stickBase = stickEl.querySelector(".base"), stickKnob = stickEl.querySelector(".knob");
   let stickId = null, stickO = null;
   const setKeys = (l, r, u, d) => { keys.left = l; keys.right = r; keys.up = u; keys.down = d; };
@@ -1450,8 +1467,10 @@
   const inMenu = () => phase === "intro" || phase === "over";               // characters only change between matches
   function setChar(id) { if (!inMenu()) return; charId = id; try { localStorage.setItem("roo-seal-char", id); } catch (e) {} renderChars(); }
   function setOpp(id) { if (!inMenu()) return; oppPick = id; if (id !== "random") oppId = id; try { localStorage.setItem("roo-seal-opp", id); } catch (e) {} renderChars(); }
-  function showOverlay(title, text, btn) { ovTitle.textContent = title; ovText.textContent = text; overlay.dataset.mode = "text"; ovBtn.textContent = btn; overlay.hidden = false; charsEl.hidden = oppsEl.hidden = courtsEl.hidden = setsEl.hidden = cstat.hidden = phase === "paused" || (touch && phase === "over"); overlay.scrollTop = 0; }
+  function showOverlay(title, text, btn) { ovTitle.textContent = title; ovText.textContent = text; overlay.dataset.mode = "text"; ovBtn.textContent = btn; overlay.hidden = false; charsEl.hidden = oppsEl.hidden = courtsEl.hidden = setsEl.hidden = cstat.hidden = phase === "paused" || phase === "over"; overlay.scrollTop = 0; overShownAt = performance.now(); clipEl.classList.toggle("over", phase === "over"); }   // result screen: clip tucked in the bottom corner
+  const stopClip = () => { clipEl.pause(); clipEl.classList.remove("on", "over"); };
   function startMatch() {
+    stopClip();
     if (touch && !document.fullscreenElement && document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape")).catch(() => {});
     }
@@ -1462,14 +1481,14 @@
     particles.length = 0; startServe();
   }
   function togglePause() {
-    if (phase === "paused") { phase = pausedFrom; overlay.hidden = true; }
-    else if (phase === "serve" || phase === "rally" || phase === "point") { pausedFrom = phase; phase = "paused"; showOverlay("暫停中", touch ? "按下方按鈕繼續。" : "按 P 或下方按鈕繼續。", "繼續"); }
+    if (phase === "paused") { phase = pausedFrom; overlay.hidden = true; if (clipEl.classList.contains("on")) clipEl.play().catch(() => {}); }
+    else if (phase === "serve" || phase === "rally" || phase === "point") { pausedFrom = phase; phase = "paused"; clipEl.pause(); showOverlay("暫停中", touch ? "按下方按鈕繼續。" : "按 P 或下方按鈕繼續。", "繼續"); }
   }
   ovBtn.addEventListener("click", () => { if (phase === "paused") togglePause(); else startMatch(); });
   document.addEventListener("visibilitychange", () => { if (document.hidden && (phase === "serve" || phase === "rally" || phase === "point")) togglePause(); });
   // back to the character menu (the intro overlay); the match restarts from "開始比賽"
   function showMenu() {
-    phase = "intro"; ball.live = false; msg = ""; roo.bubble = seal.bubble = ""; placeForServe();
+    stopClip(); phase = "intro"; ball.live = false; msg = ""; roo.bubble = seal.bubble = ""; placeForServe();
     ovTitle.textContent = "網球大亂鬥"; ovBtn.textContent = "開始比賽"; delete overlay.dataset.mode;
     charsEl.hidden = oppsEl.hidden = courtsEl.hidden = setsEl.hidden = cstat.hidden = false; overlay.hidden = false; overlay.scrollTop = 0;
     for (const b of document.querySelectorAll('.chars button[aria-pressed="true"]')) b.scrollIntoView({ block: "nearest", inline: "center" });   // selected pill visible on phones
