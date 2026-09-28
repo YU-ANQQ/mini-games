@@ -36,13 +36,15 @@
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden; background: #1b2a55; touch-action: none; user-select: none; -webkit-user-select: none; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  .overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; background: rgba(12, 14, 30, .7); text-align: center; padding: 16px; }
+  .overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; overflow-y: auto; background: rgba(12, 14, 30, .7); text-align: center; padding: 16px; }
   .overlay[hidden] { display: none; }
   .overlay h2 { font-family: "Bungee", "Noto Sans TC", system-ui, sans-serif; font-weight: 400; margin: 0; font-size: clamp(22px, 5vw, 44px); text-wrap: balance; }
-  .overlay ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--dim); font-size: clamp(12px, 2.2vw, 15px); line-height: 1.5; max-width: 42ch; text-align: left; }
+  .overlay ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--dim); font-size: clamp(12px, 2.2vw, 14px); line-height: 1.5; max-width: 42ch; text-align: left; }
+  .quick { color: var(--dim); font-size: 14px; } .quick .touch { display: none; }
+  .rules summary { color: var(--dim); font-size: 13px; cursor: pointer; }
   .overlay li b { color: var(--text); font-weight: 700; }
   .overlay p { margin: 0; color: var(--dim); max-width: 38ch; line-height: 1.6; }
-  .overlay[data-mode="text"] ul, .overlay:not([data-mode="text"]) p { display: none; }
+  .overlay[data-mode="text"] .rules, .overlay[data-mode="text"] .quick, .overlay:not([data-mode="text"]) p { display: none; }
   .chars { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
   .chars button { font: inherit; font-size: 15px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
   .chars .lab { align-self: center; color: var(--dim); font-size: 13px; }
@@ -62,7 +64,7 @@
   .acts { display: grid; grid-template-columns: 76px 76px; grid-template-rows: 60px 60px; gap: 8px; }
   .acts .hit { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); grid-row: span 2; border-radius: 999px; }
   .acts .jump { grid-row: span 2; border-radius: 999px; }
-  @media (pointer: coarse) { .pad { display: flex; } .keys { display: none; } }
+  @media (pointer: coarse) { .pad { display: flex; } .keys { display: none; } .quick .touch { display: inline; } }
   .help { display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--dim); font-size: 14px; line-height: 1.6; }
   kbd { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text); }
 </style>
@@ -77,7 +79,7 @@
         <button type="button" id="lv-hard" data-lv="hard" aria-pressed="false">困難</button>
       </div>
       <button type="button" class="btn" id="sound" aria-pressed="true">音效：開</button>
-      <button type="button" class="btn" id="restart">重新開始</button>
+      <button type="button" class="btn" id="restart">重選角色</button>
     </div>
   </div>
 
@@ -85,22 +87,23 @@
     <canvas id="c" aria-label="袋鼠打海豹網球遊戲畫面"></canvas>
     <div class="overlay" id="overlay">
       <h2 id="ov-title">袋鼠打海豹</h2>
-      <ul>
-        <li>先選自己的角色（←→ 切換）和對手（↑↓ 切換，可選隨機），每隻速度、跳躍、手長、必殺技都不一樣。</li>
-        <li><b>方向鍵</b>移動，跑到球的落點（地上的黃圈）。</li>
-        <li>打球只有一顆鍵：<b>Z／空白鍵＝打</b>。球還沒到就先按＝<b>蓄力</b>，球一到自動打出，蓄滿是 MAX。</li>
-        <li>擊球瞬間按住 <b>↑ 高吊</b>、<b>↓ 小球</b>、<b>←→</b> 控制左右；球還沒落地就打＝<b>截擊</b>。</li>
-        <li><b>X＝跳</b>。高球會在地上標出紅色「<b>扣殺點</b>」：站進去，頭上出現「跳！」就跳，空中按一下打＝<b>扣殺</b>（球一進範圍自動打）。</li>
-        <li><b>發球</b>：每分左右區輪流（亮起的格子就是要發的地方）。按一次拋球、最高點再按＝完美發球；擊球時按住 <b>↑ 上旋</b>（彈高前竄）、<b>↓ 切球</b>（貼地滑）。</li>
-        <li>邊跑邊打，球會往跑的方向拐（側旋）；高吊自帶上旋、小球自帶切。</li>
-        <li><b>體力條</b>（比分下方綠條）：跑動、跳、飛撲、<b>蓄力</b>都會耗體力，站著會回；體力越少跑越慢。每隻角色還有專屬<b>特技</b>。</li>
-        <li>擊球會集氣（完美擊球、蓄滿 MAX 集得更快），集滿後<b>下一球自動打出</b>角色專屬必殺。</li>
-      </ul>
       <p id="ov-text"></p>
       <div class="chars" id="chars" role="group" aria-label="選角色"></div>
       <div class="chars" id="opps" role="group" aria-label="選對手"></div>
       <div class="cstat" id="cstat"></div>
       <button type="button" class="play" id="ov-btn">開始比賽</button>
+      <div class="quick"><span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>Z</kbd> 打　<kbd>X</kbd> 跳</span><span class="touch">左邊移動，右邊「打」「跳」</span></div>
+      <details class="rules">
+        <summary>完整玩法</summary>
+        <ul>
+          <li>跑到地上的<b>黃圈</b>按「打」。提早按＝<b>蓄力</b>（會多耗體力）。</li>
+          <li>擊球時按住 <b>↑ 高吊</b>、<b>↓ 小球</b>、<b>←→</b> 方向；邊跑邊打球會拐彎。</li>
+          <li>高球會出現紅色<b>扣殺點</b>：站進去，看到「跳！」就跳，空中按「打」＝扣殺。</li>
+          <li><b>發球</b>：按一次拋球、最高點再按；按住 ↑ 上旋、↓ 切球。左右區每分輪流。</li>
+          <li>集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。</li>
+          <li><b>體力</b>越少跑越慢，站著會回。P 暫停。</li>
+        </ul>
+      </details>
     </div>
   </div>
 
@@ -117,13 +120,7 @@
     </div>
   </div>
 
-  <div class="help keys">
-    <span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> 移動</span>
-    <span><kbd>Z</kbd>／<kbd>空白鍵</kbd> 打（提早按＝蓄力）</span>
-    <span>擊球時 <kbd>↑</kbd> 高吊、<kbd>↓</kbd> 小球</span>
-    <span><kbd>X</kbd> 跳（高球跳起來打＝扣殺）</span>
-    <span><kbd>P</kbd> 暫停</span>
-  </div>
+  <div class="help keys"><kbd>←→↑↓</kbd> 移動　<kbd>Z</kbd> 打（擊球時 ↑ 高吊、↓ 小球）　<kbd>X</kbd> 跳　<kbd>P</kbd> 暫停</div>
 </div>
 
 <script>
@@ -997,8 +994,7 @@
   function renderChars() {
     row(charsEl, "自己", Object.keys(CHARS), charId, setChar);
     row(oppsEl, "對手", OPP_IDS, oppPick, setOpp);
-    const c = me(), o = oppPick === "random" ? "隨機（開打時抽）" : `${opp().name}：${opp().tag}`;
-    cstat.textContent = `${c.name}：${c.tag}｜特技 ${c.tdesc}｜必殺 ${c.sp.name.replace("！", "")}　　對手 ${o}`;
+    const c = me(); cstat.textContent = `${c.tdesc}｜必殺：${c.sp.name.replace("！", "")}`;
   }
   function setChar(id) { charId = id; try { localStorage.setItem("roo-seal-char", id); } catch (e) {} renderChars(); }
   function setOpp(id) { oppPick = id; if (id !== "random") oppId = id; try { localStorage.setItem("roo-seal-opp", id); } catch (e) {} renderChars(); }
@@ -1014,7 +1010,13 @@
   }
   ovBtn.addEventListener("click", () => { if (phase === "paused") togglePause(); else startMatch(); });
   document.addEventListener("visibilitychange", () => { if (document.hidden && (phase === "serve" || phase === "rally" || phase === "point")) togglePause(); });
-  document.getElementById("restart").addEventListener("click", (e) => { e.currentTarget.blur(); startMatch(); });
+  // back to the character menu (the intro overlay); the match restarts from "開始比賽"
+  function showMenu() {
+    phase = "intro"; ball.live = false; msg = ""; placeForServe();
+    ovTitle.textContent = "袋鼠打海豹"; ovBtn.textContent = "開始比賽"; delete overlay.dataset.mode;
+    charsEl.hidden = oppsEl.hidden = cstat.hidden = false; overlay.hidden = false;
+  }
+  document.getElementById("restart").addEventListener("click", (e) => { e.currentTarget.blur(); showMenu(); });
   const sBtn = document.getElementById("sound");
   sBtn.addEventListener("click", () => { soundOn = !soundOn; sBtn.textContent = soundOn ? "音效：開" : "音效：關"; sBtn.setAttribute("aria-pressed", soundOn); sBtn.blur(); });
   document.querySelectorAll(".seg button").forEach((b) => {
