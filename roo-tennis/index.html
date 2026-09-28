@@ -144,6 +144,7 @@
           <li>高球會出現紅色<b>扣殺點</b>：站進去，看到「跳！」就跳，空中按「打」＝扣殺。</li>
           <li><b>發球</b>：按一次拋球、最高點再按；按住 ↑ 上旋、↓ 切球。左右區每分輪流。</li>
           <li>集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。</li>
+          <li>連續 3 次<b>完美擊球</b>＝<b>無我境界</b>：完美區變大、集氣加倍，丟分才解除。</li>
           <li>對方必殺飛來時打出<b>完美擊球</b>或<b>蓄滿 MAX</b>＝<b>退貨</b>，原路打回去（可以一直互懟，越來越快）。</li>
           <li><b>體力</b>越少跑越慢，站著會回。P 暫停。</li>
         </ul>
@@ -265,6 +266,10 @@
   // counter ("退貨"): receive the other side's special with a perfect hit or a MAX charge -> it flies back as YOUR special,
   // COUNTER_SPEEDUP faster each exchange (capped). The AI counters with LEVELS[level].counter. Supers (ball.yeet) can't be countered.
   const COUNTER_SPEEDUP = 1.15, COUNTER_MAX_SPEED = 50;
+  // zen ("無我境界"): ZEN_ROW perfect hits in a row (player only) -> golden aura until you lose a point:
+  // perfect zone x ZEN_ZONE, meter gain x ZEN_METER, shot speed x ZEN_SPEED
+  const ZEN_ROW = 3, ZEN_ZONE = 2, ZEN_METER = 2, ZEN_SPEED = 1.1;
+  const perfZone = () => PERFECT_D * (me().trait === "precise" ? PRECISE_K : 1) * (roo.zen ? ZEN_ZONE : 1);
   const COUNTER_LINES = ["還給你！", "退貨！", "無駄無駄無駄！", "反射！", "這招我收下了", "原封不動奉還"];
   const YEET_LINES = ["你還差得遠呢", "再見了您嘞～", "飛走囉～☆", "芭比Q了", "我好了", "Emotional Damage!", "這合理嗎？", "你沒事吧？", "物理學不存在了"];
   const EV_LINES = {                                                     // [winner lines, loser lines]
@@ -440,6 +445,8 @@
     if (ball.kind === "sp" && ball.owner === winner) msg = ball.swaps ? (winner === 0 ? "退貨成功！" : "被退貨了…") : winner === 0 ? "必殺得分！" : charOf(1).sp.name.replace("！", "") + "得分";
     const W_ = winner === 0 ? roo : seal, Lz = winner === 0 ? seal : roo;
     if (W_.rage) { W_.rage = false; say(W_, "呼…冷靜下來了"); }             // rage lasts until the hulk wins a point
+    if (Lz.zen) { Lz.zen = false; say(Lz, "境界…解除了"); }
+    Lz.perfRow = 0;
     W_.lostRow = 0; Lz.lostRow = (Lz.lostRow || 0) + 1;                   // rage trait: losing a point
     const raged = charOf(Lz.side).trait === "rage" && Lz.lostRow >= 1 && !Lz.rage;
     if (raged) { Lz.rage = true; Lz.lostRow = 0; }
@@ -584,13 +591,21 @@
       if (isSuper) { speed *= 1.3; msg = sup.name; ball.yeet = true; freeze = 0.4; flash = 0.6; shake = 1.2; rageRoar(hp); }
       playClip(b.side === 0 ? charId : oppId, isSuper);
     } else if (b.side === 0) {
-      b.meter = Math.min(1, b.meter + ((quality === "perfect" ? 0.3 : 0.2) + (charge >= 0.95 ? 0.15 : 0)) * me().meter);
+      b.meter = Math.min(1, b.meter + ((quality === "perfect" ? 0.3 : 0.2) + (charge >= 0.95 ? 0.15 : 0)) * me().meter * (b.zen ? ZEN_METER : 1));
       if (b.meter >= 1) { b.armed = true; say(b, "必殺準備！"); beep(880, 0.2, "sawtooth", 0.1, 1.5); }   // full meter: the next hit is the special, automatically
     } else {
       b.meter = Math.min(1, b.meter + LEVELS[level].meter * opp().meter); power = 0.2;
     }
     if (b.side === 0 && ball.kind === "normal" && Math.abs(b.vx) > 1) ball.curve = b.vx * 0.6;   // running sidespin
+    if (b.side === 0 && b.zen) speed *= ZEN_SPEED;
     ball.spSpeed = speed;                                                  // the counter speeds up from here
+    if (b.side === 0 && quality !== "dive") {                             // zen streak: perfect hits in a row
+      b.perfRow = quality === "perfect" ? (b.perfRow || 0) + 1 : 0;
+      if (b.perfRow >= ZEN_ROW && !b.zen) {
+        b.zen = true; msg = "無我境界！"; msgT = 0; say(b, pick(["……（進入狀態）", "看得見球的軌跡了", "身體自己動起來了"])); freeze = Math.max(freeze, 0.35); flash = Math.max(flash, 0.5);
+        rings.push({ x: hp.x, y: hp.y, r: 20, max: 260, life: 0.6, t: 0, color: "#ffd65a" }); [990, 1320, 1760].forEach((f, i) => setTimeout(() => beep(f, 0.2, "sine", 0.13), i * 90)); buzz([20, 30, 20, 30, 60]);
+      }
+    }
     const rageShot = charOf(b.side).trait === "rage" && b.rage && ball.kind === "normal";   // rage ball: top speed in the game
     if (rageShot) speed = Math.max(speed, 46);
     launch(tx, ty, speed, rageShot ? 0.2 : 0.45);
@@ -693,7 +708,7 @@
         const charge = roo.charging ? Math.min(1, roo.chargeT / 0.9) : 0;
         const smash = roo.z > 0.15 && ball.z > 1.8;
         const shot = smash ? "smash" : vert > 0 ? "lob" : vert < 0 ? "drop" : bounces === 0 ? "volley" : "drive";
-        const q = smash ? (Math.abs(roo.vz) < 1.6 ? "perfect" : "good") : roo.diveT > 0 ? "dive" : d < PERFECT_D * (me().trait === "precise" ? PRECISE_K : 1) ? "perfect" : "good";
+        const q = smash ? (Math.abs(roo.vz) < 1.6 ? "perfect" : "good") : roo.diveT > 0 ? "dive" : d < perfZone() ? "perfect" : "good";
         hitBall(roo, shot, q, aim, charge);
       }
     }
@@ -929,7 +944,8 @@
     ctx.fillStyle = handShade; ctx.beginPath(); ctx.arc(hand.x, hand.y, 5, 0, Math.PI * 2); ctx.fill();
   }
   function glow(b, color) {
-    if (!b.armed) return;
+    if (b.zen && !b.armed) color = "rgba(255,215,90,.6)";                // zen aura (the special's glow wins when both)
+    if (!b.armed && !b.zen) return;
     const t = performance.now() / 1000, r = 72 + Math.sin(t * 8) * 6;
     const g = ctx.createRadialGradient(10, -70, 10, 10, -70, r); g.addColorStop(0, color); g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(10, -70, r, 0, Math.PI * 2); ctx.fill();
@@ -949,7 +965,7 @@
       ctx.strokeStyle = ok ? "rgba(255,214,90,.95)" : "rgba(255,255,255,.18)"; ctx.lineWidth = ok ? 3 : 1.5;
       ctx.beginPath(); ctx.ellipse(g0.x, g0.y + 2, me().reach * K * g0.s, me().reach * K * g0.s * 0.28, 0, 0, Math.PI * 2); ctx.stroke();
       ctx.font = '400 16px "Bungee", "Noto Sans TC", sans-serif'; ctx.textAlign = "center";
-      const pr = PERFECT_D * (me().trait === "precise" ? PRECISE_K : 1), perf = ok && !b.z && d < pr;   // perfect zone: wait for the ball to get this close
+      const pr = perfZone(), perf = ok && !b.z && d < pr;   // perfect zone: wait for the ball to get this close
       ctx.strokeStyle = perf ? "rgba(143,244,255,1)" : "rgba(143,244,255,.35)"; ctx.lineWidth = perf ? 4 : 1.5;
       if (perf) { ctx.fillStyle = "rgba(143,244,255,.25)"; ctx.beginPath(); ctx.ellipse(g0.x, g0.y + 2, pr * K * g0.s, pr * K * g0.s * 0.28, 0, 0, Math.PI * 2); ctx.fill(); }
       ctx.beginPath(); ctx.ellipse(g0.x, g0.y + 2, pr * K * g0.s, pr * K * g0.s * 0.28, 0, 0, Math.PI * 2); ctx.stroke();
@@ -1213,6 +1229,7 @@
     ctx.font = '500 12px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#a9b0cf"; ctx.fillText(score.server === 0 ? "● " + me().name + "發球" : opp().name + "發球 ●", W / 2, 66);
     if (phase === "serve") { ctx.fillStyle = "#f6c453"; ctx.fillText(serveCourt() === "right" ? "右區發球" : "左區發球", W / 2, 80); }
     ctx.font = '700 14px "Noto Sans TC", sans-serif';
+    if (roo.zen && !roo.armed && phase !== "over") { ctx.fillStyle = "#ffd65a"; ctx.fillText("無我境界（完美區 ×2）", W / 2 - 135, 102); }
     if (roo.armed && phase !== "over") { ctx.fillStyle = `rgb(${me().sp.rgb})`; ctx.fillText("下一球自動必殺！", W / 2 - 135, 102); }
     ctx.restore(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (phase === "serve" && score.server === 0) { ctx.font = `700 ${18 * U}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#f3f1ea"; ctx.fillText(tossT < 0 ? (touch ? "按「打」拋球" : "按「打」拋球（←→ 方向、↑ 上旋、↓ 切球）") : "球在最高點時再按一次！", W / 2, touch ? H - 26 : 132); }   // phones: under the near baseline, clear of the far player
@@ -1386,7 +1403,7 @@
     }
     G = 12 * court().g;
     score.pts = [0, 0]; score.games = [0, 0]; score.server = 0; msg = ""; overlay.hidden = true; bestRally = 0; resolveOpp();
-    for (const b of [roo, seal]) { b.meter = 0; b.armed = false; b.bubble = ""; b.st = 1; b.rage = false; b.lostRow = 0; }
+    for (const b of [roo, seal]) { b.meter = 0; b.armed = false; b.bubble = ""; b.st = 1; b.rage = false; b.lostRow = 0; b.zen = false; b.perfRow = 0; }
     gag.yeets = [0, 0]; gag.kos = [0, 0]; gag.pigeonT = -1; gag.timeStopT = 0; roo.zoneT = seal.zoneT = 0;
     particles.length = 0; startServe();
   }
