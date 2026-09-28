@@ -192,7 +192,7 @@
                draw: (c) => bodyBear(c) },
     hulk:    { name: "綠巨人", speed: 5.8, jump: 4.6, reach: 1.6, dive: 3.0, power: 1.35, meter: 1.0, band: "#3fa34d", tag: "力量大、速度慢",
                sp: { name: "綠巨人・天崩地裂砲！", speed: 40, rgb: "120,230,110", fx: "quake", hurt: "地、地震了！", stun: 1.6 },
-               trait: "rage", tdesc: "暴怒：丟 1 分就變身，拿下一分前每球（含發球）球速開到最大", stDrain: 0.8,
+               trait: "rage", tdesc: "暴怒：丟 1 分就變身，拿下一分前每球（含發球）球速開到最大，但體力消耗翻倍", stDrain: 0.8,
                look: { sprite: "hulk", skin: "#6cbf4a" }, draw: (c, b) => bodyHuman(c, b) },
     cap:     { name: "帽子哥", speed: 6.6, jump: 5.2, reach: 1.45, dive: 3.0, power: 1.0, meter: 1.3, band: "#2d3340", tag: "均衡型",
                sp: { name: "手塚領域！", speed: 30, rgb: "255,210,150", fx: "curve", hurt: "球自己跑過去了…", zone: 8 },
@@ -460,7 +460,7 @@
     rally++; bestRally = Math.max(bestRally, rally);
     const hp = P(ball.x, ball.y, ball.z);
     const inSpd = Math.hypot(ball.vx, ball.vy);                           // fast incoming ball costs stamina to hold
-    if (inSpd > ST_HIT_FROM) b.st = Math.max(0, b.st - (inSpd - ST_HIT_FROM) * ST_HIT * charOf(b.side).stDrain);
+    if (inSpd > ST_HIT_FROM) b.st = Math.max(0, b.st - (inSpd - ST_HIT_FROM) * ST_HIT * charOf(b.side).stDrain * (b.rage ? 2 : 1));
     if (ball.yeet) {                                                      // bear MAX / super special: the receiver is launched off the court
       ball.yeet = false; b.stun = 2; b.spinT = 1.8; b.z = 0.01; b.vz = 11; b.vx = (Math.random() - 0.5) * 6; b.vy = b.side === 0 ? -7 : 7;
       b.swing = 1; rageRoar(hp); freeze = 0.3; shake = 1; flash = 0.5; say(b, "啊啊啊——");
@@ -669,7 +669,7 @@
     if (b.stun > 0) { b.stun -= dt; ix = iy = 0; }
     const ch = charOf(b.side), moving = Math.hypot(ix, iy) > 0.05;
     const use = (moving ? ST_RUN : -ST_REST) + (b.charging ? ST_CHARGE : 0);
-    b.st = clamp(b.st - use * (use > 0 ? ch.stDrain : 1) * dt, 0, 1);
+    b.st = clamp(b.st - use * (use > 0 ? ch.stDrain * (b.rage ? 2 : 1) : 1) * dt, 0, 1);   // raging hulk burns stamina twice as fast
     if (b.st < 0.2 && !b.panted) { b.panted = true; say(b, "喘…喘…"); } else if (b.st > 0.5) b.panted = false;
     speed *= ST_MIN + ST_SPAN * b.st;
     if (b.charging && ch.trait === "heavy") speed *= 0.35;                // bear: MAX charge is a win button, so it plants his feet
@@ -699,7 +699,7 @@
     const dB = Math.hypot(ball.x - seal.x, ball.y - seal.y), apex = REACH_Z + opp().jump * opp().jump / (2 * G) * 1.6;
     if (phase === "rally" && lastHitter === 0 && !ball.netted && !seal.willMiss && seal.stun <= 0 && seal.frozen <= 0 && ball.y > NET_Y
         && dB < opp().reach * SMASH_REACH && ball.z > REACH_Z - 0.2 && ball.z < apex - 0.3 && ball.vz < 2) {
-      seal.vz = opp().jump; seal.z = 0.001; seal.st = Math.max(0, seal.st - ST_JUMP); seal.vx *= 0.3; seal.vy *= 0.3;
+      seal.vz = opp().jump; seal.z = 0.001; seal.st = Math.max(0, seal.st - ST_JUMP * (seal.rage ? 2 : 1)); seal.vx *= 0.3; seal.vy *= 0.3;
     }
     let tx = 0, ty = L - 1;
     if (phase === "rally" && lastHitter === 0 && !ball.netted) {
@@ -765,7 +765,7 @@
     if (incoming && d < me().reach && inReachZ()) { roo.swingT = 0.2; roo.swingCd = 0.35; }                   // in reach: swing now
     else if (incoming && ball.y < NET_Y && d < me().dive && ball.z < 2.2 && (ball.vy < 0 || bounces === 1)) {    // just out of reach: dive
       const k = 1 / 0.26; roo.diveT = 0.26; roo.diveVx = (ball.x - roo.x) * k * 0.8; roo.diveVy = (ball.y - roo.y) * k * 0.8;
-      roo.st = Math.max(0, roo.st - ST_DIVE * (me().trait === "slide" ? 0.3 : 1));
+      roo.st = Math.max(0, roo.st - ST_DIVE * (me().trait === "slide" ? 0.3 : 1) * (roo.rage ? 2 : 1));
       roo.swingCd = 0.8; say(roo, me().trait === "slide" ? "肚子滑～" : "飛撲！"); beep(330, 0.15, "sawtooth", 0.08, 1.8);
     } else if (incoming) { roo.charging = true; roo.chargeT = 0; roo.swing = 0.3; beep(520, 0.08, "sine", 0.06, 1.5); }  // early: charge up
     else { roo.swingT = 0.2; roo.swingCd = 0.35; }
@@ -775,11 +775,11 @@
     if (phase !== "rally" || roo.diveT > 0 || roo.recover > 0 || roo.frozen > 0 || roo.stun > 0) return;
     if (roo.z > 0) {                                                      // kangaroo trait: one more jump in the air
       if (me().trait !== "dj" || roo.dj >= 2) return;
-      roo.dj = (roo.dj || 0) + 1; roo.vz = me().jump * 0.85; roo.st = Math.max(0, roo.st - ST_JUMP); say(roo, roo.dj === 1 ? "二段跳！" : "三段跳！！"); beep(620, 0.12, "sine", 0.08, 1.6);
+      roo.dj = (roo.dj || 0) + 1; roo.vz = me().jump * 0.85; roo.st = Math.max(0, roo.st - ST_JUMP * (roo.rage ? 2 : 1)); say(roo, roo.dj === 1 ? "二段跳！" : "三段跳！！"); beep(620, 0.12, "sine", 0.08, 1.6);
       if (roo.swingT > 0) roo.swingT = (roo.vz + Math.sqrt(roo.vz * roo.vz + 2 * G * roo.z)) / G + 0.05;   // racket stays ready till the new landing
       return;
     }
-    roo.vz = me().jump * (0.85 + 0.15 * roo.st); roo.z = 0.001; roo.st = Math.max(0, roo.st - ST_JUMP); beep(420, 0.12, "sine", 0.08, 1.6);
+    roo.vz = me().jump * (0.85 + 0.15 * roo.st); roo.z = 0.001; roo.st = Math.max(0, roo.st - ST_JUMP * (roo.rage ? 2 : 1)); beep(420, 0.12, "sine", 0.08, 1.6);
     const p = P(roo.x, roo.y); burst(p.x, p.y, 6, "rgba(200,215,240,.8)", 80, 0.3, 150);
   }
   // ball height the kangaroo can reach: standing REACH_Z, jumping adds its height (with a longer arm overhead)
