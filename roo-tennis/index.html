@@ -47,6 +47,7 @@
   .overlay h2 { font-family: "Bungee", "Noto Sans TC", system-ui, sans-serif; font-weight: 400; margin: 0; font-size: clamp(22px, 5vw, 44px); text-wrap: balance; }
   .overlay ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--dim); font-size: clamp(12px, 2.2vw, 14px); line-height: 1.5; max-width: 42ch; text-align: left; }
   .quick { color: var(--dim); font-size: 14px; } .quick .touch { display: none; }
+  .linkbtn { background: none; border: 0; color: var(--dim); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; }
   .rules summary { color: var(--dim); font-size: 13px; cursor: pointer; }
   .overlay li b { color: var(--text); font-weight: 700; }
   .overlay p { margin: 0; color: var(--dim); max-width: 38ch; line-height: 1.6; white-space: pre-line; }
@@ -102,6 +103,7 @@
       <div class="cstat" id="cstat"></div>
       <button type="button" class="play" id="ov-btn">開始比賽</button>
       <div class="quick"><span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打　<kbd>X</kbd> 跳</span><span class="touch">左邊移動，右邊「打」「跳」</span></div>
+      <button type="button" class="linkbtn" id="replay">▶ 重看開場動畫</button>
       <details class="rules">
         <summary>完整玩法</summary>
         <ul>
@@ -1266,16 +1268,21 @@
     });
   });
 
-  // cover: first visit plays the intro clip (tap to skip), then the menu sits on the welcome picture; later visits skip straight to it.
+  // cover: every page load plays the intro clip (tap to skip), then the menu sits on the welcome picture; "重看開場" replays it.
   // Clips are base64 at file end (window.COVER_SRC = { intro, welcome }), which loads after this script, hence the load event.
+  const introEl = document.getElementById("intro");
+  function playIntro() {
+    const C = window.COVER_SRC; if (!C || !C.intro) return;
+    const done = () => { introEl.hidden = true; introEl.pause(); };
+    if (!introEl.src) introEl.src = C.intro;
+    introEl.onended = done; introEl.onclick = done; introEl.hidden = false; introEl.currentTime = 0;
+    introEl.play().catch(done);                                            // autoplay blocked (e.g. phone power saving): just show the menu
+  }
+  document.getElementById("replay").addEventListener("click", (e) => { e.currentTarget.blur(); playIntro(); });
   addEventListener("load", () => {
     const C = window.COVER_SRC; if (!C) return;
     overlay.style.setProperty("--welcome", `url(${C.welcome})`); overlay.classList.add("welcome");
-    let seen = false; try { seen = localStorage.getItem("roo-seal-intro") === "1"; } catch (e) {}
-    if (seen || !C.intro || location.hash === "#test") return;
-    const v = document.getElementById("intro");
-    const done = () => { v.hidden = true; v.pause(); try { localStorage.setItem("roo-seal-intro", "1"); } catch (e) {} };
-    v.src = C.intro; v.hidden = false; v.onended = done; v.onclick = done; v.play().catch(done);
+    if (location.hash !== "#test") playIntro();
   });
 
   function resize() {
