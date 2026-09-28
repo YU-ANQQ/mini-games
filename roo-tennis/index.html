@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>網球大亂鬥</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;500;700&display=swap">
@@ -60,19 +62,43 @@
   .cstat { color: var(--dim); font-size: 13px; min-height: 1.4em; white-space: pre-line; }
   .play { font: inherit; font-weight: 700; font-size: 18px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; padding: 12px 28px; cursor: pointer; }
   .play:hover { filter: brightness(1.08); }
-  /* touch pad (phones) */
-  .pad { display: none; justify-content: space-between; align-items: center; gap: 12px; }
-  .dpad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 56px); gap: 4px; }
-  .dpad button, .acts button {
-    font: inherit; font-weight: 700; color: var(--text); background: var(--panel); border: 1px solid var(--line);
-    border-radius: 12px; touch-action: none; user-select: none; -webkit-user-select: none; font-size: 18px;
+  /* touch mode (body.touch, set by JS from pointer: coarse / narrow screen): the stage fills the screen,
+     controls float over it — a floating stick (bottom-left, appears where the thumb lands) and big 打／跳 (bottom-right) */
+  .pad, #pausebtn, .touchonly { display: none; }
+  body.touch { padding: 0; overflow: hidden; touch-action: manipulation; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  body.touch .top, body.touch .help { display: none; }
+  body.touch .wrap { max-width: none; height: 100vh; height: 100dvh; display: grid; place-items: center; gap: 0; }
+  body.touch .stage { width: min(100vw, 160vh); width: min(100vw, 160dvh); border-radius: 0; }
+  body.touch .touchonly { display: inline-block; }
+  body.touch .quick .touch { display: inline; } body.touch .keys { display: none; }
+  body.touch .pad { display: block; position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+  body.touch .pad.off { display: none; }                          /* hidden while a menu covers the stage */
+  #stick { position: absolute; left: 0; bottom: 0; width: 50vw; height: 75%; pointer-events: auto; touch-action: none; }
+  #stick .base, #stick .knob { position: absolute; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); }
+  #stick .base { width: 128px; height: 128px; border: 3px solid rgba(255,255,255,.35); background: rgba(20,24,43,.25); }
+  #stick .knob { width: 60px; height: 60px; background: rgba(246,196,83,.55); border: 2px solid rgba(255,255,255,.6); }
+  #stick .hint { position: absolute; left: 18px; bottom: 14px; color: rgba(255,255,255,.55); font-size: 13px; }
+  #stick.held .hint { display: none; }
+  .acts { position: absolute; right: max(14px, env(safe-area-inset-right)); bottom: 16px; width: 200px; height: 190px; pointer-events: none; }
+  .acts button { position: absolute; pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; border-radius: 50%;
+    font: 700 22px "Noto Sans TC", sans-serif; color: var(--text); background: rgba(29,35,64,.35); border: 3px solid rgba(255,255,255,.45); }
+  .acts .hit { width: 104px; height: 104px; right: 0; bottom: 0; font-size: 28px; background: rgba(246,196,83,.72); color: var(--accent-ink); border-color: #ffe08a; }
+  .acts .jump { width: 78px; height: 78px; right: 112px; bottom: 70px; }
+  .acts button.on { filter: brightness(1.35); transform: scale(.94); }
+  body.touch #pausebtn { display: block; position: absolute; left: 8px; top: 8px; z-index: 3; width: 40px; height: 40px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.5); background: rgba(12,14,30,.5); color: #fff; font: 700 16px sans-serif; }
+  body.touch #pausebtn[hidden] { display: none; }
+  body.touch .overlay { position: fixed; place-content: start center; grid-auto-rows: max-content; padding-top: 14px; }   /* menus use the whole screen, not just the (small, in portrait) stage */
+  body.touch .overlay .opts { justify-content: center; }
+  body.touch .chars { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; max-width: 100%; scrollbar-width: none; }
+  body.touch .chars button, body.touch .chars .lab { flex: none; white-space: nowrap; }
+  .rotate { color: var(--accent); font-size: 14px; }
+  @media (orientation: landscape) { .rotate { display: none !important; } }
+  @media (orientation: portrait) {                                  /* portrait phone: stage on top, controls get the space below */
+    body.touch .wrap { place-items: start center; }
+    #stick { height: calc(100% - 62.5vw); top: auto; }
+    .acts { bottom: 40px; }
   }
-  .dpad button.on, .acts button.on { background: var(--line); }
-  .dpad .u { grid-column: 2; grid-row: 1; } .dpad .l { grid-column: 1; grid-row: 2; } .dpad .r { grid-column: 3; grid-row: 2; } .dpad .d { grid-column: 2; grid-row: 3; }
-  .acts { display: grid; grid-template-columns: 76px 76px; grid-template-rows: 60px 60px; gap: 8px; }
-  .acts .hit { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); grid-row: span 2; border-radius: 999px; }
-  .acts .jump { grid-row: span 2; border-radius: 999px; }
-  @media (pointer: coarse), (max-width: 640px) { .pad { display: flex; } .keys { display: none; } .quick .touch { display: inline; } }
   @media (max-width: 600px) { .chars { gap: 4px; } .chars button { padding: 4px 10px; font-size: 13px; } .overlay { gap: 8px; padding: 10px; } .cstat { font-size: 12px; } }
   .help { display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--dim); font-size: 14px; line-height: 1.6; }
   kbd { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text); }
@@ -97,6 +123,7 @@
     <video id="clip" muted playsinline aria-hidden="true"></video>
     <video id="intro" muted playsinline aria-label="開場動畫（點一下跳過）" hidden></video>
     <button type="button" id="skip" hidden>跳過 ▶▶</button>
+    <button type="button" id="pausebtn" aria-label="暫停／選單">❚❚</button>
     <div class="overlay" id="overlay">
       <h2 id="ov-title">網球大亂鬥</h2>
       <p id="ov-text"></p>
@@ -105,6 +132,7 @@
       <div class="chars" id="courts" role="group" aria-label="選場地"></div>
       <div class="cstat" id="cstat"></div>
       <button type="button" class="play" id="ov-btn">開始比賽</button>
+      <div class="rotate touchonly">↻ 手機橫放更好玩</div>
       <div class="quick"><span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打　<kbd>X</kbd> 跳</span><span class="touch">左邊移動，右邊「打」「跳」</span></div>
       <button type="button" class="linkbtn" id="replay">▶ 重看開場動畫</button>
       <details class="rules">
@@ -121,13 +149,8 @@
     </div>
   </div>
 
-  <div class="pad" aria-label="觸控操作">
-    <div class="dpad">
-      <button type="button" class="u" data-k="up" aria-label="上">▲</button>
-      <button type="button" class="l" data-k="left" aria-label="左">◀</button>
-      <button type="button" class="r" data-k="right" aria-label="右">▶</button>
-      <button type="button" class="d" data-k="down" aria-label="下">▼</button>
-    </div>
+  <div class="pad" id="pad" aria-label="觸控操作">
+    <div id="stick" aria-label="移動（按住拖曳）"><div class="base" hidden></div><div class="knob" hidden></div><span class="hint">按住這半邊拖曳＝移動</span></div>
     <div class="acts">
       <button type="button" class="hit" data-k="hit">打</button>
       <button type="button" class="jump" data-k="jump">跳</button>
@@ -260,6 +283,10 @@
   const overlay = document.getElementById("overlay"), ovTitle = document.getElementById("ov-title"),
         ovText = document.getElementById("ov-text"), ovBtn = document.getElementById("ov-btn");
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // touch mode: phones / tablets (or a very narrow window) get the full-screen stage with the floating controls (CSS: body.touch)
+  const touch = matchMedia("(pointer: coarse)").matches || innerWidth <= 640;
+  document.body.classList.toggle("touch", touch);
+  const buzz = (ms) => { if (touch && soundOn && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} };   // haptic hit feel (Android; iOS ignores)
 
   let level = "normal";
   try { const s = localStorage.getItem("roo-seal-level"); if (s && LEVELS[s]) level = s; } catch (e) {}
@@ -327,7 +354,7 @@
   }
   // everything that makes a hit feel heavy: hit-stop, shake, shockwave, radial streaks, squash, sound
   function impact(sx, sy, power, color = "#fff3c4") {
-    freeze = Math.max(freeze, 0.045 + power * 0.085);
+    freeze = Math.max(freeze, 0.045 + power * 0.085); buzz(Math.round(12 + power * 45));
     shake = Math.max(shake, 0.12 + power * 0.35);
     flash = Math.max(flash, power * 0.18);
     rings.push({ x: sx, y: sy, r: 8, max: 60 + power * 90, life: 0.35, t: 0, color });
@@ -463,7 +490,7 @@
     if (inSpd > ST_HIT_FROM) b.st = Math.max(0, b.st - (inSpd - ST_HIT_FROM) * ST_HIT * charOf(b.side).stDrain * (b.rage ? 2 : 1));
     if (ball.yeet) {                                                      // bear MAX / super special: the receiver is launched off the court
       ball.yeet = false; b.stun = 2; b.spinT = 1.8; b.z = 0.01; b.vz = 11; b.vx = (Math.random() - 0.5) * 6; b.vy = b.side === 0 ? -7 : 7;
-      b.swing = 1; rageRoar(hp); freeze = 0.3; shake = 1; flash = 0.5; say(b, "啊啊啊——");
+      b.swing = 1; rageRoar(hp); freeze = 0.3; shake = 1; flash = 0.5; say(b, "啊啊啊——"); buzz([80, 40, 160]);
       gag.yeets[1 - b.side]++; stickSomewhere(b);
       ball.kind = "normal"; awardPoint(1 - b.side, pick(YEET_LINES), "yeet"); return;
     }
@@ -1047,13 +1074,14 @@
 
   function drawBubble(b) {
     if (!b.bubble || b.bubbleT > 1.6) return;
-    const p = P(b.x, b.y, b.z), x = p.x, y = p.y - 200 * p.s * CHAR;
+    const p = P(b.x, b.y, b.z), x = 0, y = 0;
+    ctx.save(); ctx.translate(p.x, p.y - 200 * p.s * CHAR); if (touch) ctx.scale(1.25, 1.25);   // phones: bigger bubble, same anchor
     ctx.globalAlpha = Math.min(1, (1.6 - b.bubbleT) * 3);
     ctx.font = '700 16px "Noto Sans TC", sans-serif'; const w = ctx.measureText(b.bubble).width + 20;
     ctx.fillStyle = "#fbf7ee"; roundRect(x - w / 2, y - 17, w, 32, 14); ctx.fill();
     ctx.beginPath(); ctx.moveTo(x - 6, y + 14); ctx.lineTo(x, y + 26); ctx.lineTo(x + 6, y + 14); ctx.fill();
     ctx.fillStyle = "#1d2340"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(b.bubble, x, y);
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = 1; ctx.restore();
   }
   function drawBall() {
     let bx = ball.x, by = ball.y, bz = ball.z;
@@ -1115,7 +1143,11 @@
     ctx.fillStyle = "rgba(255,255,255,.12)"; roundRect(x - 50, y, 100, 7, 4); ctx.fill();
     ctx.fillStyle = armed ? "#ffffff" : color; roundRect(x - 50, y, Math.max(7, 100 * v), 7, 4); ctx.fill();
   }
+  // HUD_TOUCH: on phones the 960-wide canvas shrinks to ~40-65%, so the score panel and the call-outs are drawn bigger
+  const HUD_TOUCH = 1.3;
   function drawHUD() {
+    const U = touch ? HUD_TOUCH : 1;
+    ctx.save(); ctx.translate(W / 2, 0); ctx.scale(U, U); ctx.translate(-W / 2, 0);   // score panel, scaled around the top centre
     ctx.fillStyle = "rgba(14,17,34,.8)"; roundRect(W / 2 - 220, 10, 440, 86, 10); ctx.fill();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = '500 14px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#a9b0cf";
@@ -1135,10 +1167,11 @@
     if (phase === "serve") { ctx.fillStyle = "#f6c453"; ctx.fillText(serveCourt() === "right" ? "右區發球" : "左區發球", W / 2, 80); }
     ctx.font = '700 14px "Noto Sans TC", sans-serif';
     if (roo.armed && phase !== "over") { ctx.fillStyle = `rgb(${me().sp.rgb})`; ctx.fillText("下一球自動必殺！", W / 2 - 135, 102); }
-    if (phase === "serve" && score.server === 0) { ctx.font = '700 18px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#f3f1ea"; ctx.fillText(tossT < 0 ? "按「打」拋球（←→ 方向、↑ 上旋、↓ 切球）" : "球在最高點時再按一次！", W / 2, 130); }
-    if (phase === "rally" && rally >= 5) { ctx.font = '400 16px "Bungee", "Noto Sans TC", sans-serif'; ctx.fillStyle = "rgba(246,196,83,.9)"; ctx.fillText(`連續 ${rally} 拍`, W / 2, 130); }
+    ctx.restore(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (phase === "serve" && score.server === 0) { ctx.font = `700 ${18 * U}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#f3f1ea"; ctx.fillText(tossT < 0 ? (touch ? "按「打」拋球" : "按「打」拋球（←→ 方向、↑ 上旋、↓ 切球）") : "球在最高點時再按一次！", W / 2, touch ? H - 26 : 132); }   // phones: under the near baseline, clear of the far player
+    if (phase === "rally" && rally >= 5) { ctx.font = `400 ${16 * U}px "Bungee", "Noto Sans TC", sans-serif`; ctx.fillStyle = "rgba(246,196,83,.9)"; ctx.fillText(`連續 ${rally} 拍`, W / 2, 110 + 22 * U); }
     if (msg && msgT < 1.4) {
-      ctx.globalAlpha = Math.min(1, 1.6 - msgT); ctx.font = '400 36px "Bungee", "Noto Sans TC", sans-serif';
+      ctx.globalAlpha = Math.min(1, 1.6 - msgT); ctx.font = `400 ${36 * U}px "Bungee", "Noto Sans TC", sans-serif`;
       ctx.fillStyle = ball.kind === "sp" ? `rgb(${charOf(ball.owner).sp.rgb})` : "#f6c453";
       ctx.lineWidth = 5; ctx.strokeStyle = "rgba(10,12,28,.85)"; ctx.lineJoin = "round"; ctx.strokeText(msg, W / 2, 190 - msgT * 10);
       ctx.fillText(msg, W / 2, 190 - msgT * 10); ctx.globalAlpha = 1;
@@ -1192,6 +1225,7 @@
       else if (phase !== "intro" && phase !== "paused" && phase !== "over") update(dt);
       else stepParticles(dt);
       render();
+      if (touch) { const cover = !overlay.hidden || !introEl.hidden; padEl.classList.toggle("off", cover); pauseEl.hidden = cover; }
     } catch (e) { console.error(e); ctx.setTransform(1, 0, 0, 1, 0, 0); }
   }
   function update(dt) {
@@ -1233,13 +1267,41 @@
     else if (e.code === "Enter" && (phase === "intro" || phase === "over")) startMatch();
   });
   addEventListener("keyup", (e) => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
-  document.querySelectorAll(".pad button").forEach((b) => {
+  document.querySelectorAll(".acts button").forEach((b) => {
     const k = b.dataset.k;
-    const on = (e) => { e.preventDefault(); b.classList.add("on"); if (k in keys) keys[k] = true; else if (k === "jump") jump(); else swing(); };
-    const off = () => { b.classList.remove("on"); if (k in keys) keys[k] = false; };
+    const on = (e) => { e.preventDefault(); b.classList.add("on"); buzz(8); if (k === "jump") jump(); else swing(); };
+    const off = () => b.classList.remove("on");
     b.addEventListener("pointerdown", on); ["pointerup", "pointercancel", "pointerleave"].forEach((t) => b.addEventListener(t, off));
   });
+  // floating stick: the base appears where the thumb lands; the drag direction (8 ways, 45° sectors) drives the same keys as the arrows,
+  // so shot choice (↑ lob / ↓ drop / ←→ aim) works exactly like the keyboard. STICK_DEAD: px of drag before it counts; STICK_MAX: knob travel
+  const STICK_DEAD = 14, STICK_MAX = 52;
+  const stickEl = document.getElementById("stick"), stickBase = stickEl.querySelector(".base"), stickKnob = stickEl.querySelector(".knob");
+  let stickId = null, stickO = null;
+  const setKeys = (l, r, u, d) => { keys.left = l; keys.right = r; keys.up = u; keys.down = d; };
+  function stickMove(e) {
+    const dx = e.clientX - stickO.x, dy = e.clientY - stickO.y, len = Math.hypot(dx, dy), k = Math.min(1, STICK_MAX / (len || 1));
+    stickKnob.style.left = stickO.lx + dx * k + "px"; stickKnob.style.top = stickO.ly + dy * k + "px";
+    if (len < STICK_DEAD) { setKeys(false, false, false, false); return; }
+    const sec = (Math.round(Math.atan2(-dy, dx) / (Math.PI / 4)) + 8) % 8;   // 0 = right, counter-clockwise
+    setKeys(sec >= 3 && sec <= 5, sec === 7 || sec <= 1, sec >= 1 && sec <= 3, sec >= 5 && sec <= 7);
+  }
+  stickEl.addEventListener("pointerdown", (e) => {
+    if (stickId !== null) return;
+    e.preventDefault(); stickId = e.pointerId; stickEl.setPointerCapture(e.pointerId);
+    const r = stickEl.getBoundingClientRect(), lx = e.clientX - r.left, ly = e.clientY - r.top;
+    stickO = { x: e.clientX, y: e.clientY, lx, ly };
+    for (const el of [stickBase, stickKnob]) { el.hidden = false; el.style.left = lx + "px"; el.style.top = ly + "px"; }
+    stickEl.classList.add("held"); stickMove(e);
+  });
+  stickEl.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) stickMove(e); });
+  const stickUp = (e) => { if (e.pointerId !== stickId) return; stickId = null; stickBase.hidden = stickKnob.hidden = true; stickEl.classList.remove("held"); setKeys(false, false, false, false); };
+  ["pointerup", "pointercancel"].forEach((t) => stickEl.addEventListener(t, stickUp));
+  addEventListener("blur", () => setKeys(false, false, false, false));     // never leave a direction stuck down
+  document.getElementById("pausebtn").addEventListener("click", (e) => { e.currentTarget.blur(); togglePause(); });
 
+  const padEl = document.getElementById("pad"), pauseEl = document.getElementById("pausebtn");
+  if (touch) overlay.insertBefore(document.querySelector(".opts"), document.getElementById("ov-btn"));   // header is hidden in touch mode: difficulty / sound / 重選角色 live in the menu (and the pause screen)
   const charsEl = document.getElementById("chars"), oppsEl = document.getElementById("opps"), courtsEl = document.getElementById("courts"), cstat = document.getElementById("cstat");
   const OPP_IDS = [...Object.keys(CHARS), "random"];
   function row(el, label, ids, cur, onPick) {
@@ -1264,6 +1326,9 @@
   function setOpp(id) { if (!inMenu()) return; oppPick = id; if (id !== "random") oppId = id; try { localStorage.setItem("roo-seal-opp", id); } catch (e) {} renderChars(); }
   function showOverlay(title, text, btn) { ovTitle.textContent = title; ovText.textContent = text; overlay.dataset.mode = "text"; ovBtn.textContent = btn; overlay.hidden = false; charsEl.hidden = oppsEl.hidden = courtsEl.hidden = cstat.hidden = phase === "paused"; }
   function startMatch() {
+    if (touch && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape")).catch(() => {});
+    }
     G = 12 * court().g;
     score.pts = [0, 0]; score.games = [0, 0]; score.server = 0; msg = ""; overlay.hidden = true; bestRally = 0; resolveOpp();
     for (const b of [roo, seal]) { b.meter = 0; b.armed = false; b.bubble = ""; b.st = 1; b.rage = false; b.lostRow = 0; }
@@ -1272,7 +1337,7 @@
   }
   function togglePause() {
     if (phase === "paused") { phase = pausedFrom; overlay.hidden = true; }
-    else if (phase === "serve" || phase === "rally" || phase === "point") { pausedFrom = phase; phase = "paused"; showOverlay("暫停中", "按 P 或下方按鈕繼續。", "繼續"); }
+    else if (phase === "serve" || phase === "rally" || phase === "point") { pausedFrom = phase; phase = "paused"; showOverlay("暫停中", touch ? "按下方按鈕繼續。" : "按 P 或下方按鈕繼續。", "繼續"); }
   }
   ovBtn.addEventListener("click", () => { if (phase === "paused") togglePause(); else startMatch(); });
   document.addEventListener("visibilitychange", () => { if (document.hidden && (phase === "serve" || phase === "rally" || phase === "point")) togglePause(); });
