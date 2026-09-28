@@ -107,10 +107,10 @@
   .tray { display: none; }
   .tray .tside { display: grid; gap: 3px; justify-items: center; font-size: 15px; }
   .tray .tg { font: 400 28px "Bungee", "Noto Sans TC", sans-serif; line-height: 1; } .tray .t0 { color: #f6c453; } .tray .t1 { color: #7fe0ff; }
-  .tray .bar { display: block; width: 100%; height: 9px; border-radius: 5px; background: linear-gradient(90deg, var(--c, #ff8a3a) calc(var(--v, 0) * 100%), rgba(255,255,255,.12) 0); }
-  .tray .bar.st { height: 7px; }
+  .tray .bar { display: block; width: 100%; height: 15px; border-radius: 5px; font: 700 10px/15px "Noto Sans TC", sans-serif; color: #fff; text-shadow: 0 1px 2px #000; padding-left: 5px; box-sizing: border-box; background: linear-gradient(90deg, var(--c, #ff8a3a) calc(var(--v, 0) * 100%), rgba(255,255,255,.12) 0); }
+  .tray .bar.st { height: 13px; line-height: 13px; }
   .tray .tmid { display: grid; gap: 4px; justify-items: center; align-content: start; text-align: center; }
-  .tray .tpts { font: 400 22px "Bungee", "Noto Sans TC", sans-serif; } .tray #t-srv { color: var(--dim); font-size: 13px; }
+  .tray .tpts { font: 400 22px "Bungee", "Noto Sans TC", sans-serif; } .tray #t-srv { color: var(--dim); font-size: 13px; white-space: pre-line; }
   .tray .thint { color: var(--accent); font-size: 15px; font-weight: 700; min-height: 2.6em; line-height: 1.3; white-space: pre-line; }
   @media (orientation: landscape) { .rotate { display: none !important; } }
   @media (orientation: portrait) {                                  /* portrait phone: stage on top, controls get the space below */
@@ -175,9 +175,9 @@
   </div>
 
   <div class="tray" id="tray" aria-hidden="true">
-    <div class="tside"><b id="t-n0"></b><span class="tg t0" id="t-g0"></span><i class="bar" id="t-m0"></i><i class="bar st" id="t-s0"></i></div>
+    <div class="tside"><b id="t-n0"></b><span class="tg t0" id="t-g0"></span><i class="bar" id="t-m0">必殺</i><i class="bar st" id="t-s0">體力</i></div>
     <div class="tmid"><div class="tpts" id="t-pts"></div><div id="t-srv"></div><div class="thint" id="t-hint"></div></div>
-    <div class="tside"><b id="t-n1"></b><span class="tg t1" id="t-g1"></span><i class="bar" id="t-m1"></i><i class="bar st" id="t-s1"></i></div>
+    <div class="tside"><b id="t-n1"></b><span class="tg t1" id="t-g1"></span><i class="bar" id="t-m1">必殺</i><i class="bar st" id="t-s1">體力</i></div>
   </div>
 
   <div class="pad" id="pad" aria-label="觸控操作">
@@ -459,8 +459,8 @@
     const srv = score.server, sx = serveX(), rx = -sx * 1.15;
     const newGame = score.pts[0] + score.pts[1] === 0;                     // stamina: a little back per point, full at each new game
     for (const b of [roo, seal]) { b.st = newGame ? 1 : Math.min(1, b.st + ST_POINT); b.noseUsed = 0; b.dj = 0; }
-    Object.assign(roo, { stuckP: null, stuckT: 0, koT: 0, tomatoT: 0, x: srv === 0 ? sx : rx, y: srv === 0 ? -0.5 : 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
-    Object.assign(seal, { stuckP: null, stuckT: 0, koT: 0, tomatoT: 0, x: srv === 1 ? sx : rx, y: srv === 1 ? L + 0.5 : L - 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
+    Object.assign(roo, { meteor: false, stuckP: null, stuckT: 0, koT: 0, tomatoT: 0, x: srv === 0 ? sx : rx, y: srv === 0 ? -0.5 : 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
+    Object.assign(seal, { meteor: false, stuckP: null, stuckT: 0, koT: 0, tomatoT: 0, x: srv === 1 ? sx : rx, y: srv === 1 ? L + 0.5 : L - 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
   }
   // side that wins the match with the next point (or -1)
   function matchPointSide() {
@@ -675,6 +675,7 @@
     if (ch.trait === "rage" && b.rage && ball.kind === "normal") { ball.heavy = true; ball.rage = true; power = 1; color = "#ff5a3c"; msg = "暴怒重擊！"; msgT = 0; shake = 0.9; freeze = 0.25; rageRoar(hp); }
     if (ch.trait === "static" && quality === "perfect") {                 // electric mouse trait: perfect hit zaps the other side
       foe.stun = Math.max(foe.stun, 0.9); say(foe, "滋滋滋滋…"); const fp = P(foe.x, foe.y, 1); burst(fp.x, fp.y, 18, "#fff27a", 180, 0.4, 0);
+      gag.bolt = { x1: hp.x, y1: hp.y, x2: fp.x, y2: fp.y, t: 0.3 };
       for (let k = 1; k < 14; k++) { const f = k / 14; particles.push({ x: hp.x + (fp.x - hp.x) * f + (Math.random() - 0.5) * 18, y: hp.y + (fp.y - hp.y) * f + (Math.random() - 0.5) * 18, vx: 0, vy: 0, life: 0.3, max: 0.3, color: "#fff27a", grav: 0, r: 3 }); }   // lightning chain
     }
     b.swing = 1; b.swingT = 0; b.charging = false; b.chargeT = 0;
@@ -1348,6 +1349,11 @@
     ctx.fillStyle = "#1f1a18"; ctx.fillRect(x - 4, y - 44, 22, 4); ctx.fillRect(x, y - 54, 14, 10);   // referee cap
   }
   function drawGags() {
+    if (gag.bolt && gag.bolt.t > 0) {                                        // electric mouse static: zigzag bolt, re-jittered every frame
+      const b = gag.bolt; b.t -= 1 / 60; ctx.strokeStyle = "#fff27a"; ctx.lineWidth = 4; ctx.shadowColor = "#fff27a"; ctx.shadowBlur = 12; ctx.beginPath(); ctx.moveTo(b.x1, b.y1);
+      for (let k = 1; k < 8; k++) { const f = k / 8; ctx.lineTo(b.x1 + (b.x2 - b.x1) * f + (Math.random() - 0.5) * 26, b.y1 + (b.y2 - b.y1) * f + (Math.random() - 0.5) * 26); }
+      ctx.lineTo(b.x2, b.y2); ctx.stroke(); ctx.shadowBlur = 0;
+    }
     if (gag.duckT < 1.8) {                                                  // duck line judge pops up from the bottom-left
       const up = Math.min(1, gag.duckT * 6) * Math.min(1, (1.8 - gag.duckT) * 6), x = 70, y = H * 0.62 + 60 * (1 - up);
       drawDuck(x, y, Math.abs(Math.sin(gag.duckT * 20)));
@@ -1405,7 +1411,7 @@
       render();
       if (touch) {
         const cover = !overlay.hidden || !introEl.hidden; padEl.classList.toggle("off", cover); pauseEl.hidden = cover;
-        if (trayOn()) updateTray();
+        trayEl.hidden = cover; if (trayOn() && !cover) updateTray();   // the tray (z 5) would sit on top of the menu's start button
         const cnt = counterChance(); if (hitEl.classList.contains("counter") !== cnt) { hitEl.classList.toggle("counter", cnt); hitEl.textContent = cnt ? "退貨!" : "打"; }
       }
     } catch (e) { console.error(e); ctx.setTransform(1, 0, 0, 1, 0, 0); }
@@ -1484,6 +1490,7 @@
 
   const hitEl = document.querySelector(".acts .hit");
   // portrait tray: same information as the canvas score panel + the hint lines, written only when a value changes
+  const trayEl = document.getElementById("tray");
   const T = Object.fromEntries(["n0", "n1", "g0", "g1", "m0", "m1", "s0", "s1", "pts", "srv", "hint"].map((k) => [k, document.getElementById("t-" + k)]));
   const setT = (k, v) => { if (T[k].textContent !== v) T[k].textContent = v; };
   const setBar = (k, v, c) => { T[k].style.setProperty("--v", v.toFixed(3)); T[k].style.setProperty("--c", c); };
@@ -1492,8 +1499,8 @@
     setBar("m0", roo.meter, roo.armed ? "#ffffff" : "#ff8a3a"); setBar("m1", seal.meter, seal.armed ? "#ffffff" : `rgb(${opp().sp.rgb})`);
     for (const [k, b] of [["s0", roo], ["s1", seal]]) setBar(k, b.st, b.st > 0.5 ? "#5ee08a" : b.st > 0.2 ? "#f6c453" : "#ff5a4a");
     const mp = phase === "serve" || phase === "rally" ? matchPointSide() : -1;
-    setT("pts", pointLabel() + (mp === 0 ? "　賽點" : mp === 1 ? "　對手賽點" : ""));
-    setT("srv", (score.server === 0 ? me().name : opp().name) + "發球" + (phase === "serve" ? "・" + (serveCourt() === "right" ? "右區" : "左區") : ""));
+    setT("pts", pointLabel());
+    setT("srv", (mp === 0 ? "賽點！" : mp === 1 ? "對手賽點！" : "") + (mp >= 0 ? "\n" : "") + (score.server === 0 ? me().name : opp().name) + "發球" + (phase === "serve" ? "・" + (serveCourt() === "right" ? "右區" : "左區") : ""));
     const hint = counterChance() ? "提早按「打」蓄力或完美擊球＝退貨！"
       : phase === "serve" && score.server === 0 ? (tossT < 0 ? "按「打」拋球" : "球在最高點時再按一次！")
       : roo.armed ? `下一球自動必殺！
