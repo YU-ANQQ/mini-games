@@ -287,6 +287,10 @@
     }
     ball.squash = 0.14; thwack(power);
   }
+  function rageRoar(sp) {                                                  // hulk transform / rage hit: red shockwave + low roar
+    rings.push({ x: sp.x, y: sp.y, r: 20, max: 220, life: 0.6, t: 0, color: "#ff5a3c" }); burst(sp.x, sp.y, 36, "#ff5a3c", 260, 0.7, 0);
+    beep(90, 0.5, "sawtooth", 0.2, -40);
+  }
   function stepParticles(dt) {
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i]; p.life -= dt; if (p.life <= 0) { particles.splice(i, 1); continue; }
@@ -309,7 +313,7 @@
     Object.assign(seal, { x: srv === 1 ? sx : rx, y: srv === 1 ? L + 0.5 : L - 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
   }
   function startServe() {
-    placeForServe(); phase = "serve"; serveT = 0; tossT = -1; ball.live = false; ball.kind = "normal"; ball.trail = []; ball.netted = false;
+    placeForServe(); phase = "serve"; serveT = 0; tossT = -1; ball.live = false; ball.kind = "normal"; ball.trail = []; ball.netted = false; ball.heavy = false; ball.rage = false;
     lastHitter = score.server; bounces = 0; rally = 0;
   }
   // ev: "net" | "out" | "miss" (what ended the point); turned into "smashed" / "whiff" when that is the funnier truth
@@ -319,7 +323,8 @@
     if (ball.kind === "sp" && ball.owner === winner) msg = winner === 0 ? "必殺得分！" : charOf(1).sp.name.replace("！", "") + "得分";
     const W_ = winner === 0 ? roo : seal, Lz = winner === 0 ? seal : roo;
     W_.lostRow = 0; Lz.lostRow = (Lz.lostRow || 0) + 1;                   // rage trait: two lost points in a row
-    if (charOf(Lz.side).trait === "rage" && Lz.lostRow >= 2 && !Lz.rage) { Lz.rage = true; Lz.lostRow = 0; }
+    const raged = charOf(Lz.side).trait === "rage" && Lz.lostRow >= 2 && !Lz.rage;
+    if (raged) { Lz.rage = true; Lz.lostRow = 0; }
     if (ev === "miss" && ball.lastShot === "smash") ev = "smashed";
     if (ev === "miss" && (Lz.swingAgo < 0.6 || Lz.willMiss)) ev = "whiff";
     if (ev === "whiff") Lz.spinT = 0.9;
@@ -328,6 +333,7 @@
     const own = (b, i) => LINES[b === roo ? charId : oppId][i];
     say(W_, pick(Math.random() < 0.5 ? own(W_, 0) : EV_LINES[ev][0])); say(Lz, pick(Math.random() < 0.5 ? own(Lz, 1) : EV_LINES[ev][1]));
     W_.clap = 1.2;
+    if (raged) { msg = "綠巨人暴怒！"; say(Lz, "吼——！！"); const rp = P(Lz.x, Lz.y, 1); rageRoar(rp); shake = Math.max(shake, 0.7); }
     const p = score.pts; p[winner]++;
     if (p[winner] >= 4 && p[winner] - p[1 - winner] >= 2) {
       score.games[winner]++; score.pts = [0, 0]; score.server = 1 - score.server;
@@ -384,8 +390,12 @@
       lastHitter = b.side; bounces = 0; ball.netted = false; b.swing = 1; ball.power = 0;
       return;
     }
+    if (ball.rage) {                                                      // hulk rage ball: blown back, long stun
+      b.stun = Math.max(b.stun, 0.9); b.y = b.side === 1 ? Math.min(L + 2, b.y + 1.6) : Math.max(-2.8, b.y - 1.6);
+      msg = "被震飛！"; msgT = 0; burst(hp.x, hp.y, 30, "#ff5a3c", 240, 0.6);
+    }
     if (ball.heavy) {                                                     // bear trait: receiving a heavy ball
-      ball.heavy = false; b.stun = Math.max(b.stun, 0.35); say(b, "好、好重！"); shake = Math.max(shake, 0.5); burst(hp.x, hp.y, 16, "#dfefff", 200, 0.5);
+      ball.heavy = false; ball.rage = false; b.stun = Math.max(b.stun, 0.35); say(b, "好、好重！"); shake = Math.max(shake, 0.5); burst(hp.x, hp.y, 16, "#dfefff", 200, 0.5);
     }
     ball.kind = "normal"; ball.curve = 0; ball.spin = shot === "lob" ? "top" : shot === "drop" ? "slice" : "flat";
     const S = SHOTS[shot];
@@ -393,12 +403,12 @@
     speed *= charOf(b.side).power;
     if (S.label) { msg = S.label; msgT = 0; }
     if (shot === "smash" && quality === "perfect") { speed = 36; power = 1; msg = "完美扣殺！"; freeze = 0.2; }
-    else if (quality === "perfect") { speed *= 1.18; power = Math.max(power, 0.6); if (!S.label) { msg = "NICE!"; msgT = 0; } }
+    else if (quality === "perfect") { speed *= 1.18; power = Math.max(power, 0.6); msg = S.label ? "完美" + S.label : "NICE!"; msgT = 0; }
     if (quality === "dive") { speed *= 0.85; power = 0.45; }
     if (charge > 0) { speed *= 1 + 0.38 * charge; power = Math.max(power, 0.35 + 0.6 * charge); if (charge >= 0.95) { msg = "MAX!"; msgT = 0; } }
     let tx = clamp(aim * S.aimK + (Math.random() - 0.5) * 1.2, -HALF_W + 0.5, HALF_W - 0.5);
     let ty = b.side === 0 ? L - depth : depth;
-    let color = charge >= 0.95 || shot === "smash" ? "#ffd65a" : "#fff3c4";
+    let color = charge >= 0.95 || shot === "smash" ? "#ffd65a" : quality === "perfect" ? "#8ff4ff" : "#fff3c4";
     if (b.armed) {
       b.armed = false; b.meter = 0; power = 1;
       const sp = charOf(b.side).sp;                                       // kind "sp" + owner: whose special, flight twist in ball.fx
@@ -418,12 +428,17 @@
     lastHitter = b.side; bounces = 0; ball.netted = false; ball.t = 0; ball.power = power; ball.lastShot = shot;
     const ch = charOf(b.side), foe = b.side === 0 ? seal : roo;
     if (ch.trait === "heavy" && charge >= 0.95 && ball.kind === "normal") { ball.heavy = true; msg = "重砲！"; msgT = 0; }
-    if (ch.trait === "rage" && b.rage && ball.kind === "normal") { b.rage = false; ball.heavy = true; power = 1; msg = "暴怒重擊！"; msgT = 0; shake = 0.9; }
+    if (ch.trait === "rage" && b.rage && ball.kind === "normal") { b.rage = false; ball.heavy = true; ball.rage = true; power = 1; color = "#ff5a3c"; msg = "暴怒重擊！"; msgT = 0; shake = 0.9; freeze = 0.25; rageRoar(hp); }
     if (ch.trait === "static" && quality === "perfect") {                 // electric mouse trait: perfect hit zaps the other side
       foe.stun = Math.max(foe.stun, 0.3); say(foe, "滋滋…"); const fp = P(foe.x, foe.y, 1); burst(fp.x, fp.y, 18, "#fff27a", 180, 0.4, 0);
     }
     b.swing = 1; b.swingT = 0; b.charging = false; b.chargeT = 0;
     impact(hp.x, hp.y, power, color);
+    if (quality === "perfect" && shot !== "smash") {                      // perfect: longer hit-stop, flash, second ring, bright chime
+      freeze = Math.max(freeze, 0.13); flash = Math.max(flash, 0.3);
+      rings.push({ x: hp.x, y: hp.y, r: 14, max: 170, life: 0.45, t: 0, color });
+      burst(hp.x, hp.y, 22, color, 230, 0.5, 60); beep(1320, 0.12, "sine", 0.16); setTimeout(() => beep(1980, 0.18, "sine", 0.13), 70);
+    }
   }
   const tossZ = (t) => 1.2 + TOSS_V * t - 0.5 * G * t * t;
   // bounce by spin: kz = vertical rebound, kxy = horizontal speed kept. Shared by stepBall and predict so the yellow
@@ -718,7 +733,11 @@
       ctx.strokeStyle = ok ? "rgba(255,214,90,.95)" : "rgba(255,255,255,.18)"; ctx.lineWidth = ok ? 3 : 1.5;
       ctx.beginPath(); ctx.ellipse(g0.x, g0.y + 2, me().reach * K * g0.s, me().reach * K * g0.s * 0.28, 0, 0, Math.PI * 2); ctx.stroke();
       ctx.font = '400 16px "Bungee", "Noto Sans TC", sans-serif'; ctx.textAlign = "center";
-      if (ok) { ctx.fillStyle = "#ffd65a"; ctx.fillText(b.z > 0 && ball.z > 2 ? "SMASH!" : "HIT!", p.x, p.y - 190 * s); }
+      const pr = PERFECT_D * (me().trait === "precise" ? 1.7 : 1), perf = ok && !b.z && d < pr;   // perfect zone: wait for the ball to get this close
+      ctx.strokeStyle = perf ? "rgba(143,244,255,1)" : "rgba(143,244,255,.35)"; ctx.lineWidth = perf ? 4 : 1.5;
+      if (perf) { ctx.fillStyle = "rgba(143,244,255,.25)"; ctx.beginPath(); ctx.ellipse(g0.x, g0.y + 2, pr * K * g0.s, pr * K * g0.s * 0.28, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.beginPath(); ctx.ellipse(g0.x, g0.y + 2, pr * K * g0.s, pr * K * g0.s * 0.28, 0, 0, Math.PI * 2); ctx.stroke();
+      if (ok) { ctx.fillStyle = perf ? "#8ff4ff" : "#ffd65a"; ctx.fillText(b.z > 0 && ball.z > 2 ? "SMASH!" : perf ? "NICE!" : "HIT!", p.x, p.y - 190 * s); }
       else if (!b.z && spot && Math.hypot(spot.x - b.x, spot.y - b.y) < me().reach * SMASH_REACH && Math.abs(spot.t - me().jump / G) < 0.15) {
         ctx.fillStyle = "#ff7a5a"; ctx.fillText("跳！", p.x, p.y - 190 * s);
       }
@@ -841,10 +860,14 @@
     return spriteImgs[id];
   }
   function bodyHuman(c, b) {
-    const img = spriteImg(c.look.sprite + (b.swing > 0.35 ? 1 : 0)), H = 200 * (b.rage ? 1.12 : 1);
+    const img = spriteImg(c.look.sprite + (b.swing > 0.35 ? 1 : 0)), H = 200 * (b.rage ? 1.25 : 1);
+    if (b.rage) {
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 110), g = ctx.createRadialGradient(8, -H / 2, 10, 8, -H / 2, 110);
+      g.addColorStop(0, `rgba(255,70,40,${0.35 + 0.25 * pulse})`); g.addColorStop(1, "rgba(255,40,20,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(8, -H / 2, 110, 0, Math.PI * 2); ctx.fill();
+    }
     if (img && img.complete && img.naturalWidth) ctx.drawImage(img, 8 - img.naturalWidth * H / img.naturalHeight / 2, -H, img.naturalWidth * H / img.naturalHeight, H);
     else { E(c.look.skin, 8, -60, 26, 50); E(c.look.skin, 10, -140, 30, 30); }                      // fallback while loading
-    if (b.rage) { ctx.strokeStyle = "rgba(255,60,40,.8)"; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(8, -H / 2, 70, H / 2 + 8, 0, 0, Math.PI * 2); ctx.stroke(); }
     return null;                                                             // null = the sprite already holds the racket
   }
   function bodySeal(c, b) {
