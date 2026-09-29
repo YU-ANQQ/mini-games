@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1b1510" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
+    <title>雙線先鋒</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet" />
+    <script type="module" crossorigin src="./assets/index-DGQhYhXW.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DslRENkZ.css">
+  <link rel="manifest" href="./manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="./registerSW.js"></script></head>
+  <body>
+    <div id="app">
+      <!-- 開始畫面 -->
+      <section id="title" class="screen show">
+        <video class="title-bg" muted loop playsinline preload="auto" poster="assets/cover.webp"></video>
+        <div class="title-shade"></div>
+        <div class="title-top">
+          <h1>雙線先鋒</h1>
+          <p class="sub">猜心・布陣・衝啊！</p>
+        </div>
+        <div class="title-menu">
+          <button class="btn primary big" data-act="play">開始對戰</button>
+          <button class="btn" data-act="tutorial">教學局 <small>（新手推薦・單線）</small></button>
+          <div class="row">
+            <button class="btn small" data-act="help">玩法說明</button>
+            <button class="btn small" data-act="settings">設定</button>
+            <button class="btn small" data-act="intro">▶ 開場動畫</button>
+          </div>
+          <p class="ver"></p>
+        </div>
+      </section>
+
+      <!-- 對戰畫面 -->
+      <section id="game" class="screen">
+        <header class="side foe">
+          <div class="fort"><span class="flag">敵</span><div class="hpbar"><i></i></div><b class="fort-num">20</b></div>
+          <div class="heroes"></div>
+          <div class="meta">牌庫 <b class="deck">0</b>・手牌 <b class="handn">0</b></div>
+        </header>
+        <div class="board-wrap">
+          <canvas id="board"></canvas>
+          <div class="round-pill">第 1/8 回合</div>
+          <button class="quit" title="回主選單">✕</button>
+          <button class="logbtn" title="上一回合紀錄">紀錄</button>
+          <div class="playbar"><button class="speed">×1</button><button class="skipbtn">跳過 ▶▶</button></div>
+          <div class="banner"></div>
+          <video class="clip" playsinline preload="none"></video>
+        </div>
+        <footer class="side me">
+          <div class="fort"><span class="flag">我</span><div class="hpbar"><i></i></div><b class="fort-num">20</b></div>
+          <div class="heroes"></div>
+          <div class="meta">牌庫 <b class="deck">0</b>・手牌 <b class="handn">0</b></div>
+        </footer>
+        <div class="tip">選卡 → 點綠格部署</div>
+        <div class="hand"></div>
+        <div class="actions">
+          <button class="skill"><img alt="" /><span><b class="sk-name">技能</b><small class="sk-cd"></small></span></button>
+          <div class="timer">20</div>
+          <button class="fight">開戰！</button>
+        </div>
+
+        <div class="log overlay">
+          <div class="panel">
+            <h2>上一回合紀錄</h2>
+            <div class="log-body"></div>
+            <button class="btn close">關閉</button>
+          </div>
+        </div>
+        <div class="result overlay">
+          <div class="panel">
+            <h2 class="r-title">勝利！</h2>
+            <video playsinline></video>
+            <p class="r-reason"></p>
+            <table class="r-stats"></table>
+            <div class="row">
+              <button class="btn primary r-again">再來一局</button>
+              <button class="btn r-menu">主選單</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 共用浮層 -->
+      <div id="help" class="overlay">
+        <div class="panel scroll">
+          <h2>怎麼玩</h2>
+          <ol class="howto">
+            <li><b>同時出牌</b>：雙方同時暗中部署，按「開戰！」後一起揭曉。猜對方打哪一線！</li>
+            <li><b>部署</b>：點亮起的卡牌 → 點綠色格子（己方底下兩排）。法術點發光的目標。點半透明的兵可撤回。</li>
+            <li><b>自動衝鋒</b>：揭曉後大家一起往前走（卡上「移」是每回合走幾步）。碰到敵人就<b>面對面互砍</b>，雙方同時扣對方攻擊力的血。</li>
+            <li><b>補位</b>：砍死對手就往前補位；衝過敵方底線＝<b>突破</b>，用攻擊力打爆敵方主堡。</li>
+            <li><b>英雄</b>：每方 3 名英雄輪流當前鋒，有專屬技能（冷卻好了按左下角技能鈕）。英雄陣亡或突破後，下回合自動派下一位替補。</li>
+            <li><b>卡牌冷卻</b>：卡牌左上角數字＝還要等幾回合。亮起的才能打；灰色是冷卻中；「無目標」是現在沒地方放。</li>
+            <li><b>勝負</b>：主堡歸零或 3 名英雄全滅就輸。第 6 回合起<b>決戰</b>，每回合雙方主堡都會扣血，最多 8 回合比主堡。</li>
+          </ol>
+          <button class="btn primary close">知道了</button>
+        </div>
+      </div>
+      <div id="settings" class="overlay">
+        <div class="panel">
+          <h2>設定</h2>
+          <label class="opt"><span>規則版本</span>
+            <select name="ruleset">
+              <option value="standard"></option>
+              <option value="spec"></option>
+            </select>
+          </label>
+          <label class="opt"><span>音效與短片聲音</span><input type="checkbox" name="sound" /></label>
+          <label class="opt"><span>技能／勝負短片</span><input type="checkbox" name="clips" /></label>
+          <label class="opt"><span>結算 2 倍速</span><input type="checkbox" name="fast" /></label>
+          <p class="small records"></p>
+          <button class="btn primary close">完成</button>
+        </div>
+      </div>
+      <div id="intro" class="overlay">
+        <video playsinline></video>
+        <button class="btn small close">跳過 ▶▶</button>
+      </div>
+    </div>
+  </body>
+</html>
