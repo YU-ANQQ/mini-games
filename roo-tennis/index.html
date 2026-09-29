@@ -203,7 +203,8 @@
   // stamina (b.st 0..1): moving drains, standing recovers, charging drains extra (the price of holding a charge);
   // speed x (ST_MIN + ST_SPAN * st): fresh legs run 10% faster than base, empty legs 35% slower
   const ST_MIN = 0.65, ST_SPAN = 0.45, ST_RUN = 0.18, ST_CHARGE = 0.44, ST_REST = 0.22, ST_JUMP = 0.2, ST_DIVE = 0.24, ST_POINT = 0.2;
-  const ST_HIT_FROM = 18, ST_HIT = 0.012;  // receiving a fast ball: stamina lost per m/s above ST_HIT_FROM (smash 32 → ~0.17)
+  const ST_HIT_FROM = 18, ST_HIT = 0.012;
+  const AI_ST_K = 0.5;                   // computer's run/charge drain x0.5: it runs every ball down, and a collapsed AI is a free point, not a rally  // receiving a fast ball: stamina lost per m/s above ST_HIT_FROM (smash 32 → ~0.17)
   const TOSS_V = 6, APEX_OK = 0.08;     // serve toss speed; perfect-serve window (s) around the toss apex
   const K = 78, Y0 = -3.2, YSPAN = L + 6.4, SCR_NEAR = 562, SCR_FAR = 152, FAR_SHRINK = 0.45;
   const LEVELS = {
@@ -697,13 +698,14 @@
     ball.x = b.x + 0.4 * dir; ball.y = b.y + 0.3 * dir; ball.z = tossT >= 0 ? tossZ(tossT) : 2.4; ball.live = true; ball.kind = "normal"; ball.trail = [];
     phase = "rally"; rally = 0; lastHitter = score.server; tossT = -1;
     const Q = { perfect: [26, 0.8, "完美發球！"], good: [20, 0.35, ""], weak: [13, 0.15, "軟軟的發球…"] }[quality];
-    launch(-Math.sign(b.x || 1) * 2.1 + aim * 1.4 * dir, NET_Y + dir * (SERVICE - 1.2), Q[0]);
+    const boxX = -Math.sign(serveX()) * 2.1;                               // diagonal box of this point's court (the one lit on the court), whoever stands where
+    launch(boxX + aim * 1.4 * dir, NET_Y + dir * (SERVICE - 1.2), Q[0]);
     bounces = 0; ball.netted = false; b.swing = 1; rally = 1; ball.power = Q[1];
     ball.spin = spin; ball.curve = 0;
     if (Q[2]) { msg = Q[2]; msgT = 0; } else if (spin !== "flat") { msg = spin === "top" ? "上旋發球！" : "切球發球！"; msgT = 0; }
     const sp = P(ball.x, ball.y, ball.z); impact(sp.x, sp.y, Q[1]); if (score.server === 0) buzz(Math.round(12 + Q[1] * 45));
     if (charOf(b.side).trait === "rage" && b.rage) {                     // raging hulk serves at top speed, through the net
-      launch(-Math.sign(b.x || 1) * 2.1 + aim * 1.4 * dir, NET_Y + dir * (SERVICE - 1.2), 46, 0.2);
+      launch(boxX + aim * 1.4 * dir, NET_Y + dir * (SERVICE - 1.2), 46, 0.2);
       ball.rage = ball.heavy = true; ball.power = 1; msg = "暴怒發球！"; msgT = 0; freeze = 0.25; shake = 0.9; rageRoar(sp);
     }
   }
@@ -771,10 +773,10 @@
       const d = Math.hypot(ball.x - seal.x, ball.y - seal.y);
       const air = seal.z > 0.15, reach = opp().reach * 0.95 * (air ? SMASH_REACH : 1);
       if (d < reach && ball.z < REACH_Z + seal.z * 1.6 && ball.z > seal.z - 0.3 && !seal.willMiss) {
-        const lob = Math.random() < 0.22, shot = air && ball.z > 1.8 ? "smash" : lob ? "lob" : bounces === 0 ? "volley" : "drive";
+        const lob = Math.random() < 0.22, shot = air && ball.z > 1.8 ? "smash" : lob ? "lob" : bounces === 0 && seal.armed ? "volley" : "drive";   // volley / dive / cap-perfect only to land a super (normal returns stay drives)
         // AI flavour of the traits it can't "press": bear sometimes hits a heavy ball, electric mouse sometimes zaps
         const t = opp().trait;
-        const q = t === "static" && Math.random() < 0.2 ? "perfect" : t === "precise" && d < PERFECT_D * PRECISE_K && Math.random() < 0.5 ? "perfect" : t === "slide" && seal.slide > 0 ? "dive" : "good";
+        const q = t === "static" && Math.random() < 0.2 ? "perfect" : seal.armed && t === "precise" && d < PERFECT_D * PRECISE_K ? "perfect" : seal.armed && t === "slide" && seal.slide > 0 ? "dive" : "good";
         hitBall(seal, shot, q, roo.x > 0 ? (Math.random() < 0.7 ? -1 : 1) : (Math.random() < 0.7 ? 1 : -1), opp().trait === "heavy" && Math.random() < 0.3 ? 1 : 0);
       }
     }
@@ -808,7 +810,7 @@
     if (b.stun > 0) { b.stun -= dt; ix = iy = 0; }
     const ch = charOf(b.side), moving = Math.hypot(ix, iy) > 0.05;
     const use = (moving ? ST_RUN : -ST_REST) + (b.charging ? ST_CHARGE : 0);
-    b.st = clamp(b.st - use * (use > 0 ? ch.stDrain * (b.rage ? 2 : 1) : 1) * dt, 0, 1);   // raging hulk burns stamina twice as fast
+    b.st = clamp(b.st - use * (use > 0 ? ch.stDrain * (b.rage ? 2 : 1) * (b.side === 1 ? AI_ST_K : 1) : 1) * dt, 0, 1);   // raging hulk burns stamina twice as fast
     if (b.st < 0.2 && !b.panted) { b.panted = true; say(b, "喘…喘…"); } else if (b.st > 0.5) b.panted = false;
     speed *= ST_MIN + ST_SPAN * b.st;
     if (b.charging && ch.trait === "heavy") speed *= 0.35;                // bear: MAX charge is a win button, so it plants his feet
@@ -832,6 +834,7 @@
   let sealTarget = null, sealDecided = false;
   function stepSeal(dt) {
     const Lv = LEVELS[level];
+    if (phase === "serve") { moveBody(seal, 0, 0, 0, dt); return; }        // stay on the spot placeForServe() gave (server: its court side, receiver: diagonal)
     if (seal.z > 0) { airStep(seal, dt); return; }
     if (seal.recover > 0) { seal.recover -= dt; moveBody(seal, 0, 0, 0, dt); return; }   // flattened after a miss
     // high ball within reach: jump (and smash it, see stepBall)
