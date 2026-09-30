@@ -210,6 +210,10 @@
   const ST_MIN = 0.65, ST_SPAN = 0.45, ST_RUN = 0.18, ST_CHARGE = 0.44, ST_REST = 0.22, ST_JUMP = 0.2, ST_DIVE = 0.24, ST_POINT = 0.2;
   const ST_HIT_FROM = 18, ST_HIT = 0.012;
   const AI_ST_K = 0.5;                   // computer's run/charge drain x0.5: it runs every ball down, and a collapsed AI is a free point, not a rally  // receiving a fast ball: stamina lost per m/s above ST_HIT_FROM (smash 32 → ~0.17)
+  // raging hulk's shots and serve (fastest normal ball, rips through the net). Was 46 = unreturnable (computer 1/18): in 一局決勝 the player
+  // serves every point and rages after every lost point, so each one was a free ace ("我發球電腦都不接"). 36: computer returns about half
+  const RAGE_SPEED = 36;
+  const AI_WALK = 0.5, AI_HOME_DEAD = 0.6;   // computer between shots: walks (half speed, half drain) back to the baseline centre, ignores < 0.6 m
   const TOSS_V = 6, APEX_OK = 0.08;     // serve toss speed; perfect-serve window (s) around the toss apex
   const K = 78, Y0 = -3.2, YSPAN = L + 6.4, SCR_NEAR = 562, SCR_FAR = 152, FAR_SHRINK = 0.45;
   const LEVELS = {
@@ -664,7 +668,7 @@
     if (b.side === 0) zenStreak(b, quality, hp);
 
     const rageShot = charOf(b.side).trait === "rage" && b.rage && ball.kind === "normal";   // rage ball: top speed in the game
-    if (rageShot) speed = Math.max(speed, 46);
+    if (rageShot) speed = Math.max(speed, RAGE_SPEED);
     launch(tx, ty, speed, rageShot ? 0.2 : 0.45);
     if (quality === "perfect" && shot !== "smash" && ball.kind === "normal" && Math.random() < (b.side === 0 ? TECH_CHANCE : TECH_CHANCE / 3)) {
       ball.tech = pick(Object.keys(TECHS)); msg = TECHS[ball.tech].name; msgSub = TECHS[ball.tech].sub; msgSubOf = msg; msgT = 0; color = `rgb(${TECHS[ball.tech].rgb})`; freeze = Math.max(freeze, 0.2);
@@ -710,7 +714,7 @@
     if (Q[2]) { msg = Q[2]; msgT = 0; } else if (spin !== "flat") { msg = spin === "top" ? "上旋發球！" : "切球發球！"; msgT = 0; }
     const sp = P(ball.x, ball.y, ball.z); impact(sp.x, sp.y, Q[1]); if (score.server === 0) buzz(Math.round(12 + Q[1] * 45));
     if (charOf(b.side).trait === "rage" && b.rage) {                     // raging hulk serves at top speed, through the net
-      launch(boxX + aim * 1.4 * dir, NET_Y + dir * (SERVICE - 1.2), 46, 0.2);
+      launch(boxX + aim * 1.4 * dir, NET_Y + dir * (SERVICE - 1.2), RAGE_SPEED, 0.2);
       ball.rage = ball.heavy = true; ball.power = 1; msg = "暴怒發球！"; msgT = 0; freeze = 0.25; shake = 0.9; rageRoar(sp);
     }
   }
@@ -814,7 +818,7 @@
     if (b.frozen > 0) { b.frozen -= dt; ix = iy = 0; }
     if (b.stun > 0) { b.stun -= dt; ix = iy = 0; }
     const ch = charOf(b.side), moving = Math.hypot(ix, iy) > 0.05;
-    const use = (moving ? ST_RUN : -ST_REST) + (b.charging ? ST_CHARGE : 0);
+    const use = (moving ? ST_RUN * Math.min(1, Math.hypot(ix, iy)) : -ST_REST) + (b.charging ? ST_CHARGE : 0);
     b.st = clamp(b.st - use * (use > 0 ? ch.stDrain * (b.rage ? 2 : 1) * (b.side === 1 ? AI_ST_K : 1) : 1) * dt, 0, 1);   // raging hulk burns stamina twice as fast
     if (b.st < 0.2 && !b.panted) { b.panted = true; say(b, "喘…喘…"); } else if (b.st > 0.5) b.panted = false;
     speed *= ST_MIN + ST_SPAN * b.st;
@@ -836,10 +840,14 @@
     }
     if (ball.live) b.face = ball.x >= b.x ? 1 : -1;
   }
-  let sealTarget = null, sealDecided = false;
+  let sealTarget = null, sealDecided = false, sealReady = 0;
   function stepSeal(dt) {
     const Lv = LEVELS[level];
-    if (phase === "serve") { moveBody(seal, 0, 0, 0, dt); return; }        // stay on the spot placeForServe() gave (server: its court side, receiver: diagonal)
+    if (phase === "serve") {                                               // stay on the spot placeForServe() gave (server: its court side, receiver: diagonal)
+      moveBody(seal, 0, 0, 0, dt);
+      if (score.server === 0) { sealReady += dt * 6; seal.hop = sealReady; }   // receiver bounces on its toes: ready, not frozen
+      return;
+    }
     if (seal.z > 0) { airStep(seal, dt); return; }
     if (seal.recover > 0) { seal.recover -= dt; moveBody(seal, 0, 0, 0, dt); return; }   // flattened after a miss
     // high ball within reach: jump (and smash it, see stepBall)
@@ -848,16 +856,20 @@
         && dB < opp().reach * SMASH_REACH && ball.z > REACH_Z - 0.2 && ball.z < apex - 0.3 && ball.vz < 2) {
       seal.vz = opp().jump; seal.z = 0.001; seal.st = Math.max(0, seal.st - ST_JUMP * (seal.rage ? 2 : 1)); seal.vx *= 0.3; seal.vy *= 0.3;
     }
-    let tx = 0, ty = L - 1;
+    let tx = 0, ty = L - 1, walk = true;
     if (phase === "rally" && lastHitter === 0 && !ball.netted) {
-      if (!sealDecided) { sealDecided = true; seal.willMiss = Math.random() < Lv.miss; sealTarget = predict(1, REACH_Z - 0.3); sealTarget.x += (Math.random() - 0.5) * Lv.err; }
-      tx = sealTarget.x - 0.35; ty = sealTarget.y + 0.5;
+      if (!sealDecided) {
+        sealDecided = true; seal.willMiss = Math.random() < Lv.miss;
+        sealTarget = predict(1, REACH_Z - 0.3); sealTarget.x += (Math.random() - 0.5) * Lv.err;
+      }
+      tx = sealTarget.x - 0.35; ty = sealTarget.y + 0.5; walk = false;
     } else { sealDecided = false; seal.willMiss = false; }
     // belly slide: a far ball gets a burst of speed (and a very undignified pose)
     const far = Math.hypot(tx - seal.x, ty - seal.y);
     if ((oppId === "seal" || opp().trait === "slide") && phase === "rally" && lastHitter === 0 && far > 2.2 && seal.slide <= 0 && seal.stun <= 0 && Math.random() < dt * 3) { seal.slide = 0.55; if (seal.bubbleT > 2) say(seal, "滑～"); }
     seal.slide = Math.max(0, seal.slide - dt);
-    moveBody(seal, clamp(tx - seal.x, -1, 1) * (Math.abs(tx - seal.x) > 0.1), clamp(ty - seal.y, -1, 1) * (Math.abs(ty - seal.y) > 0.15), Lv.speed * opp().speed / CHARS.seal.speed * (seal.slide > 0 ? 1.7 : 1), dt);
+    const home = walk && Math.hypot(tx - seal.x, ty - seal.y) < AI_HOME_DEAD, k = walk ? AI_WALK : 1;   // no ball coming: stroll home, don't sprint around
+    moveBody(seal, home ? 0 : clamp(tx - seal.x, -1, 1) * (Math.abs(tx - seal.x) > 0.1) * k, home ? 0 : clamp(ty - seal.y, -1, 1) * (Math.abs(ty - seal.y) > 0.15) * k, Lv.speed * opp().speed / CHARS.seal.speed * (seal.slide > 0 ? 1.7 : 1), dt);
     if (seal.meter >= 1 && !seal.armed && phase === "rally" && lastHitter === 0 && Math.random() < dt * 0.8) { seal.armed = true; say(seal, "看我的" + opp().sp.name.replace("！", "")); }
   }
   // airborne: keeps take-off velocity, no steering (either side)
