@@ -91,8 +91,6 @@
   .acts button { position: absolute; pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; border-radius: 50%;
     font: 700 22px "Noto Sans TC", sans-serif; color: var(--text); background: rgba(29,35,64,.35); border: 3px solid rgba(255,255,255,.45); }
   .acts .hit { width: 104px; height: 104px; right: 0; bottom: 0; font-size: 28px; background: rgba(246,196,83,.72); color: var(--accent-ink); border-color: #ffe08a; }
-  .acts .jump { width: 78px; height: 78px; right: 112px; bottom: 70px; }
-  @media (orientation: landscape) { body.touch .acts .jump { right: 13px; bottom: 116px; } }   /* stacked in the right gutter, off the court */
   .acts .hit.counter { background: rgba(143,244,255,.85); border-color: #fff; font-size: 22px; animation: pulse .35s infinite alternate; }
   @keyframes pulse { to { transform: scale(1.08); box-shadow: 0 0 24px #8ff4ff; } }
   .acts button.on { filter: brightness(1.35); transform: scale(.94); }
@@ -160,15 +158,15 @@
       <div class="cstat" id="cstat"></div>
       <button type="button" class="play" id="ov-btn">開始比賽</button>
       <div class="rotate touchonly">↻ 手機橫放更好玩</div>
-      <div class="quick"><span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打　<kbd>X</kbd> 跳</span><span class="touch">左邊移動，右邊「打」「跳」</span></div>
+      <div class="quick"><span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打　<kbd>X</kbd> 跳</span><span class="touch">左邊移動，右邊「打」</span></div>
       <button type="button" class="linkbtn" id="replay">▶ 重看開場動畫</button>
       <details class="rules">
         <summary>完整玩法</summary>
         <ul>
           <li>跑到地上的<b>黃圈</b>按「打」。提早按＝<b>蓄力</b>（會多耗體力）。</li>
           <li>擊球時按住 <b>↑ 高吊</b>、<b>↓ 小球</b>、<b>←→</b> 方向；邊跑邊打球會拐彎。</li>
-          <li>高球會出現紅色<b>扣殺點</b>：站進去，看到「跳！」就跳，空中按「打」＝扣殺。</li>
-          <li><b>發球</b>：按一次拋球、最高點再按；按住 ↑ 上旋、↓ 切球。左右區每分輪流。</li>
+          <li>高球會出現紅色<b>扣殺點</b>：站進去按「打」會自動跳起<b>扣殺</b>；看到「跳！」時按，跳到最高點打到＝<b>完美扣殺</b>。</li>
+          <li><b>發球</b>：按一次拋球、最高點再按＝完美發球；早一點按＝<b>切球</b>、晚一點按＝<b>上旋</b>。左右區每分輪流。</li>
           <li>集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。</li>
           <li>連續 3 次<b>完美擊球</b>＝<b>無我境界</b>：完美區變大、集氣加倍，丟分才解除。</li>
           <li>對拍越長球越快；贏下 10 拍以上的長對拍＝<b>必殺直接集滿</b>。</li>
@@ -189,7 +187,6 @@
     <div id="stick" aria-label="移動（按住拖曳）"><div class="base" hidden></div><div class="knob" hidden></div><span class="hint">按住這半邊拖曳＝移動</span></div>
     <div class="acts">
       <button type="button" class="hit" data-k="hit">打</button>
-      <button type="button" class="jump" data-k="jump">跳</button>
     </div>
   </div>
 
@@ -241,7 +238,7 @@
   // sp = special shot: name, speed, rgb (trail/glow), fx (flight twist in stepBall), hurt (receiver's line); draw = body painter
   const CHARS = {
     roo:     { name: "袋鼠", speed: 6.4, jump: 5.8, reach: 1.5, dive: 3.0, power: 1.0,  meter: 1.0, band: "#f6c453", tag: "平衡型",
-               sp: { name: "影分身之術・分身球！", speed: 30, rgb: "255,150,50", fx: "clone", hurt: "哪顆才是真的？！" }, trait: "dj", tdesc: "三段跳：空中還能再跳兩次", stDrain: 1.0,
+               sp: { name: "影分身之術・分身球！", speed: 30, rgb: "255,150,50", fx: "clone", hurt: "哪顆才是真的？！" }, trait: "spring", tdesc: "彈簧腿：扣殺範圍特大，完美扣殺＝袋鼠流星", stDrain: 1.0,
                draw: (c) => bodyRoo(c) },
     rabbit:  { name: "兔子", speed: 6.8, jump: 8.6, reach: 1.3, dive: 3.0, power: 0.92, meter: 1.0, band: "#ff8fb8", tag: "跳最高、手短",
                sp: { name: "月面空翻・跳跳球！", speed: 24, rgb: "255,150,200", fx: "hop", hurt: "彈去哪了！" }, trait: "hi", tdesc: "跳到外太空，扣殺球速 ×1.3", stDrain: 1.0,
@@ -348,14 +345,14 @@
   const portraitMQ = matchMedia("(orientation: portrait)"), trayOn = () => touch && portraitMQ.matches;
   const buzz = (ms) => { if (touch && soundOn && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} };   // haptic hit feel (Android; iOS ignores)
 
-  let level = "normal";
+  let level = touch ? "easy" : "normal";                                  // touch controls are harder than a keyboard: start easy
   try { const s = localStorage.getItem("roo-seal-level"); if (s && LEVELS[s]) level = s; } catch (e) {}
   let soundOn = true;
 
   // ---------- state
   const makeBody = (side) => ({ side, x: 0, y: 0, vx: 0, vy: 0, face: 1, swing: 0, swingT: 0, swingCd: 0, shot: "drive",
     meter: 0, armed: false, stun: 0, frozen: 0, bubble: "", bubbleT: 9, clap: 0, hop: 0, willMiss: false,
-    charging: false, chargeT: 0, diveT: 0, diveVx: 0, diveVy: 0, recover: 0, slide: 0, z: 0, vz: 0, swingAgo: 9, spinT: 0, netFace: 0, st: 1, panted: false, dj: 0, noseUsed: 0, rage: false, lostRow: 0, stuckT: 0, stuckP: null, koT: 0, tomatoT: 0 });
+    charging: false, chargeT: 0, diveT: 0, diveVx: 0, diveVy: 0, recover: 0, slide: 0, z: 0, vz: 0, swingAgo: 9, spinT: 0, netFace: 0, st: 1, panted: false, noseUsed: 0, rage: false, lostRow: 0, stuckT: 0, stuckP: null, koT: 0, tomatoT: 0 });
   const roo = makeBody(0), seal = makeBody(1);
   const ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, live: false, kind: "normal", t: 0, curve: 0, trail: [], netted: false, squash: 0, power: 0 };
   const rings = [];                      // impact shockwaves (screen space)
@@ -468,7 +465,7 @@
   function placeForServe() {
     const srv = score.server, sx = serveX(), rx = -sx * 1.15;
     const newGame = score.pts[0] + score.pts[1] === 0;                     // stamina: a little back per point, full at each new game
-    for (const b of [roo, seal]) { b.st = newGame ? 1 : Math.min(1, b.st + ST_POINT); b.noseUsed = 0; b.dj = 0; }
+    for (const b of [roo, seal]) { b.st = newGame ? 1 : Math.min(1, b.st + ST_POINT); b.noseUsed = 0; }
     Object.assign(roo, { meteor: false, stuckP: null, stuckT: 0, koT: 0, tomatoT: 0, x: srv === 0 ? sx : rx, y: srv === 0 ? -0.5 : 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
     Object.assign(seal, { meteor: false, stuckP: null, stuckT: 0, koT: 0, tomatoT: 0, x: srv === 1 ? sx : rx, y: srv === 1 ? L + 0.5 : L - 1.2, vx: 0, vy: 0, stun: 0, frozen: 0, swingT: 0, swing: 0, charging: false, chargeT: 0, diveT: 0, recover: 0, slide: 0, z: 0, vz: 0, spinT: 0, netFace: 0 });
   }
@@ -773,8 +770,9 @@
         const charge = roo.charging ? Math.min(1, roo.chargeT / 0.9) : 0;
         const smash = roo.z > 0.15 && ball.z > 1.8;
         const shot = smash ? "smash" : vert > 0 ? "lob" : vert < 0 ? "drop" : bounces === 0 ? "volley" : "drive";
-        const q = smash ? (Math.abs(roo.vz) < 1.6 ? "perfect" : "good") : roo.diveT > 0 ? "dive" : d < perfZone() ? "perfect" : "good";
+        const q = smash ? roo.smashQ || (Math.abs(roo.vz) < 1.6 ? "perfect" : "good") : roo.diveT > 0 ? "dive" : d < perfZone() ? "perfect" : "good";
         hitBall(roo, shot, q, aim, charge);
+        if (smash && q === "perfect" && me().trait === "spring") roo.meteor = true;   // kangaroo perfect smash: comes down as a meteor
       }
     }
     // seal: swings automatically when in reach (unless it decided to whiff this one)
@@ -883,7 +881,7 @@
       msg = "袋鼠流星！"; msgT = 0; const mp = P(b.x, b.y); burst(mp.x, mp.y, 36, "#c0652e", 260, 0.6); rings.push({ x: mp.x, y: mp.y, r: 10, max: 150, life: 0.4, t: 0, color: "#ffb35a" }); beep(80, 0.4, "sawtooth", 0.2, -20);
       if (b.side === 0) buzz([40, 30, 80]);
     }
-    if (b.z <= 0) { b.z = 0; b.vz = 0; b.dj = 0; const p = P(b.x, b.y); burst(p.x, p.y, 8, "rgba(200,215,240,.8)", 90, 0.35, 150); beep(140, 0.08, "sine", 0.12); }
+    if (b.z <= 0) { b.z = 0; b.vz = 0; b.smashQ = null; const p = P(b.x, b.y); burst(p.x, p.y, 8, "rgba(200,215,240,.8)", 90, 0.35, 150); beep(140, 0.08, "sine", 0.12); }
   }
   function stepRoo(dt) {
     if (roo.diveT > 0) {                                                  // mid-dive: flying toward the ball
@@ -919,13 +917,20 @@
     if (phase === "serve") {                                              // 1st press tosses, 2nd press hits: timing = serve quality
       if (score.server !== 0) return;
       if (tossT < 0) { tossT = 0; beep(600, 0.08, "sine", 0.06, 1.4); return; }
-      const off = Math.abs(tossT - TOSS_V / G);
-      doServe(off < APEX_OK ? "perfect" : off < 0.22 ? "good" : "weak", keys.left ? -1 : keys.right ? 1 : 0, keys.up ? "top" : keys.down ? "slice" : "flat"); return;
+      const apexT = TOSS_V / G, off = Math.abs(tossT - apexT);             // spin from timing (one button, phones too): early = slice, late = topspin
+      doServe(off < APEX_OK ? "perfect" : off < 0.22 ? "good" : "weak", keys.left ? -1 : keys.right ? 1 : 0, off < APEX_OK ? "flat" : tossT < apexT ? "slice" : "top"); return;
     }
     if (phase !== "rally" || roo.swingCd > 0 || roo.frozen > 0 || roo.stun > 0 || roo.diveT > 0 || roo.recover > 0) return;
     const incoming = lastHitter === 1 && !ball.netted && bounces < 2;
     const d = Math.hypot(ball.x - roo.x, ball.y - roo.y);
     roo.swing = 1; roo.swingAgo = 0;
+    if (incoming && !roo.z && smashReady()) {                             // smash spot: 打 jumps by itself; hit at the top of the jump = perfect smash
+      const spot = smashSpot(); roo.charging = false; roo.chargeT = 0;
+      roo.smashQ = Math.abs(spot.t - me().jump / G) < SMASH_CUE ? "perfect" : "good";   // pressed while "跳！" shows = perfect smash
+      jump();
+      const up = roo.vz / G; roo.vx = (spot.x - roo.x) / up; roo.vy = (spot.y - roo.y) / up;   // leap toward the spot, arriving at the top of the jump
+      roo.swingT = 2 * up + 0.05; roo.swingCd = 0.3; return;               // racket stays ready until landing
+    }
     if (roo.charging && !(incoming && d < me().reach && inReachZ())) return;   // already charging: an extra press must not reset it
     if (roo.z > 0) {                                                      // mid-air: racket stays ready until landing, auto-hits a ball in reach
       roo.swingT = (roo.vz + Math.sqrt(roo.vz * roo.vz + 2 * G * roo.z)) / G + 0.05; roo.swingCd = 0.3; return;
@@ -941,15 +946,16 @@
   function jump() {
     if (phase === "intro" || phase === "over") { swing(); return; }         // same start / result-screen guard as 打
     if (phase !== "rally" || roo.diveT > 0 || roo.recover > 0 || roo.frozen > 0 || roo.stun > 0) return;
-    if (roo.z > 0) {                                                      // kangaroo trait: one more jump in the air
-      if (me().trait !== "dj" || roo.dj >= 2) return;
-      roo.dj = (roo.dj || 0) + 1; roo.vz = me().jump * 0.85; if (roo.dj === 1) roo.st = Math.max(0, roo.st - ST_JUMP * (roo.rage ? 2 : 1)); say(roo, roo.dj === 1 ? "二段跳！" : "三段跳！！");
-      if (roo.dj === 2) roo.meteor = true;                                  // third jump is free: it ends as a meteor strike instead beep(620, 0.12, "sine", 0.08, 1.6);
-      if (roo.swingT > 0) roo.swingT = (roo.vz + Math.sqrt(roo.vz * roo.vz + 2 * G * roo.z)) / G + 0.05;   // racket stays ready till the new landing
-      return;
-    }
+    if (roo.z > 0) return;
     roo.vz = me().jump * (0.85 + 0.15 * roo.st); roo.z = 0.001; roo.st = Math.max(0, roo.st - ST_JUMP * (roo.rage ? 2 : 1)); beep(420, 0.12, "sine", 0.08, 1.6);
     const p = P(roo.x, roo.y); burst(p.x, p.y, 6, "rgba(200,215,240,.8)", 80, 0.3, 150);
+  }
+  // smash spot close enough and the ball not too far off: pressing 打 now jumps. SMASH_EARLY: s of slack before the "跳！" cue (early press = hit on the way down = good)
+  const SMASH_EARLY = 0.35, SMASH_CUE = 0.15, SPRING_K = 1.6;             // SMASH_CUE: ± s around the jump-to-apex time = "跳！" cue = perfect window                                // SPRING_K: kangaroo (trait spring) smash-spot radius x
+  const smashR = () => me().reach * SMASH_REACH * (me().trait === "spring" ? SPRING_K : 1);
+  function smashReady() {
+    const spot = smashSpot();
+    return !!spot && Math.hypot(spot.x - roo.x, spot.y - roo.y) < smashR() && spot.t < me().jump / G + SMASH_EARLY;
   }
   // ball height the kangaroo can reach: standing REACH_Z, jumping adds its height (with a longer arm overhead)
   const inReachZ = () => ball.z < REACH_Z + roo.z * 1.6 && ball.z > roo.z - 0.3;
@@ -1062,7 +1068,7 @@
       if (perf) { ctx.fillStyle = "rgba(143,244,255,.25)"; ctx.beginPath(); ctx.ellipse(g0.x, g0.y + 2, pr * K * g0.s, pr * K * g0.s * 0.28, 0, 0, Math.PI * 2); ctx.fill(); }
       ctx.beginPath(); ctx.ellipse(g0.x, g0.y + 2, pr * K * g0.s, pr * K * g0.s * 0.28, 0, 0, Math.PI * 2); ctx.stroke();
       if (ok) { ctx.fillStyle = perf ? "#8ff4ff" : "#ffd65a"; ctx.fillText(b.z > 0 && ball.z > 2 ? "SMASH!" : perf ? "NICE!" : "HIT!", p.x, p.y - 190 * s); }
-      else if (!b.z && spot && Math.hypot(spot.x - b.x, spot.y - b.y) < me().reach * SMASH_REACH && Math.abs(spot.t - me().jump / G) < 0.15) {
+      else if (!b.z && spot && Math.hypot(spot.x - b.x, spot.y - b.y) < smashR() && Math.abs(spot.t - me().jump / G) < SMASH_CUE) {
         ctx.fillStyle = "#ff7a5a"; ctx.fillText("跳！", p.x, p.y - 190 * s);
       }
     }
@@ -1348,7 +1354,7 @@
     }
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (!tray) {
-    if (phase === "serve" && score.server === 0) { ctx.font = `700 ${18 * U}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#f3f1ea"; ctx.fillText(tossT < 0 ? (touch ? "按「打」拋球" : "按「打」拋球（←→ 方向、↑ 上旋、↓ 切球）") : "球在最高點時再按一次！", W / 2, H - 26); }   // under the near baseline, clear of the far player and the big texts
+    if (phase === "serve" && score.server === 0) { ctx.font = `700 ${18 * U}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#f3f1ea"; ctx.fillText(tossT < 0 ? (touch ? "按「打」拋球" : "按「打」拋球（←→ 方向）") : "最高點再按！早＝切球、晚＝上旋", W / 2, H - 26); }   // under the near baseline, clear of the far player and the big texts
     if (counterChance()) {                                                // teach the counter when it matters
       ctx.font = `700 ${16 * U}px "Noto Sans TC", sans-serif`; ctx.fillStyle = "#8ff4ff";   // bottom edge: the top is busy with the caster's bubble and the special's name
       ctx.lineWidth = 4; ctx.strokeStyle = "rgba(10,12,28,.85)"; ctx.lineJoin = "round"; ctx.strokeText("提早按「打」蓄力或完美擊球＝退貨！", W / 2, H - 26); ctx.fillText("提早按「打」蓄力或完美擊球＝退貨！", W / 2, H - 26);
@@ -1522,7 +1528,7 @@
     setT("pts", pointLabel());
     setT("srv", (mp === 0 ? "賽點！" : mp === 1 ? "對手賽點！" : "") + (mp >= 0 ? "\n" : "") + (score.server === 0 ? me().name : opp().name) + "發球" + (phase === "serve" ? "・" + (serveCourt() === "right" ? "右區" : "左區") : ""));
     const hint = counterChance() ? "提早按「打」蓄力或完美擊球＝退貨！"
-      : phase === "serve" && score.server === 0 ? (tossT < 0 ? "按「打」拋球" : "球在最高點時再按一次！")
+      : phase === "serve" && score.server === 0 ? (tossT < 0 ? "按「打」拋球" : "最高點再按！早＝切球、晚＝上旋")
       : roo.armed ? `下一球自動必殺！
 超必殺：${SUPERS[charId].hint}`
       : roo.zen ? "無我境界（完美區 ×2）"
