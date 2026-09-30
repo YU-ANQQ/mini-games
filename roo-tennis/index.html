@@ -158,7 +158,7 @@
       <div class="cstat" id="cstat"></div>
       <button type="button" class="play" id="ov-btn">開始比賽</button>
       <div class="rotate touchonly">↻ 手機橫放更好玩</div>
-      <div class="quick"><span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打　<kbd>X</kbd> 跳</span><span class="touch">左邊移動，右邊「打」</span></div>
+      <div class="quick"><span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打</span><span class="touch">左邊移動，右邊「打」</span></div>
       <button type="button" class="linkbtn" id="replay">▶ 重看開場動畫</button>
       <details class="rules">
         <summary>完整玩法</summary>
@@ -190,7 +190,7 @@
     </div>
   </div>
 
-  <div class="help keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打（擊球時 ↑ 高吊、↓ 小球）　<kbd>X</kbd> 跳　<kbd>P</kbd> 暫停</div>
+  <div class="help keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打（擊球時 ↑ 高吊、↓ 小球；扣殺點上按＝自動跳殺）　<kbd>P</kbd> 暫停</div>
 </div>
 
 <script>
@@ -205,8 +205,10 @@
   // stamina (b.st 0..1): moving drains, standing recovers, charging drains extra (the price of holding a charge);
   // speed x (ST_MIN + ST_SPAN * st): fresh legs run 10% faster than base, empty legs 35% slower
   const ST_MIN = 0.65, ST_SPAN = 0.45, ST_RUN = 0.18, ST_CHARGE = 0.44, ST_REST = 0.22, ST_JUMP = 0.2, ST_DIVE = 0.24, ST_POINT = 0.2;
-  const ST_HIT_FROM = 18, ST_HIT = 0.012;
-  const AI_ST_K = 0.5;                   // computer's run/charge drain x0.5: it runs every ball down, and a collapsed AI is a free point, not a rally  // receiving a fast ball: stamina lost per m/s above ST_HIT_FROM (smash 32 → ~0.17)
+  // receiving a fast ball: stamina lost per m/s above ST_HIT_FROM (a normal drive 21 is free; bear drive 30 → 0.24, smash 32 → 0.3, perfect smash / rage 36 → 0.42)
+  // — power players can wear the other side down into the slow, collapsing zone
+  const ST_HIT_FROM = 22, ST_HIT = 0.03, ST_HIT_OUCH = 0.25;             // ST_HIT_OUCH: loss that also gets a "numb hands" line
+  const AI_ST_K = 0.5;                   // computer's run/charge drain x0.5: it runs every ball down, and a collapsed AI is a free point, not a rally (hit drain is not halved)
   // raging hulk's shots and serve (fastest normal ball, rips through the net). Was 46 = unreturnable (computer 1/18): in 一局決勝 the player
   // serves every point and rages after every lost point, so each one was a free ace ("我發球電腦都不接"). 36: computer returns about half
   const RAGE_SPEED = 36;
@@ -618,7 +620,12 @@
     rally++; bestRally = Math.max(bestRally, rally);
     const hp = P(ball.x, ball.y, ball.z);
     const inSpd = Math.hypot(ball.vx, ball.vy);                           // fast incoming ball costs stamina to hold
-    if (inSpd > ST_HIT_FROM) b.st = Math.max(0, b.st - (inSpd - ST_HIT_FROM) * ST_HIT * charOf(b.side).stDrain * (b.rage ? 2 : 1));
+    if (inSpd > ST_HIT_FROM) {
+      const loss = Math.min(b.st, (inSpd - ST_HIT_FROM) * ST_HIT * charOf(b.side).stDrain * (b.rage ? 2 : 1));
+      b.st -= loss; const lp = P(b.x, b.y, 2.4);
+      if (loss >= 0.05) particles.push({ x: lp.x, y: lp.y, vx: 0, vy: -60, life: 1, max: 1, color: "#ff4a4a", grav: 0, r: 0, txt: `體力 -${Math.round(loss * 100)}%`, size: 24 });
+      if (loss >= ST_HIT_OUCH) { say(b, pick(["手、手麻了…", "好重！骨頭要斷了", "這球有毒吧"])); shake = Math.max(shake, 0.5); }
+    }
     if ((ball.yeet || ball.kind === "sp" && ball.owner !== b.side) && calm(b)) { ball.yeet = false; say(b, pick(LINES_CALM)); }   // capybara: returns it like any ball
     else if (ball.yeet) {                                                 // bear MAX / super special: the receiver is launched off the court
       ball.yeet = false; b.stun = 2; b.spinT = 1.8; b.z = 0.01; b.vz = 11; b.vx = (Math.random() - 0.5) * 6; b.vy = b.side === 0 ? -7 : 7;
@@ -982,8 +989,7 @@
     } else if (incoming) { roo.charging = true; roo.chargeT = 0; roo.swing = 0.3; beep(520, 0.08, "sine", 0.06, 1.5); }  // early: charge up
     else { roo.swingT = 0.2; roo.swingCd = 0.35; }
   }
-  function jump() {
-    if (phase === "intro" || phase === "over") { swing(); return; }         // same start / result-screen guard as 打
+  function jump() {                                                      // only the auto smash (swing on a smash spot) jumps; no jump button since v37
     if (phase !== "rally" || roo.diveT > 0 || roo.recover > 0 || roo.frozen > 0 || roo.stun > 0) return;
     if (roo.z > 0) return;
     roo.vz = me().jump * (0.85 + 0.15 * roo.st); roo.z = 0.001; roo.st = Math.max(0, roo.st - ST_JUMP * (roo.rage ? 2 : 1)); beep(420, 0.12, "sine", 0.08, 1.6);
@@ -1363,7 +1369,7 @@
       ctx.globalAlpha = Math.max(0, p.life / p.max);
       if (p.streak) { ctx.strokeStyle = p.color; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.04, p.y - p.vy * 0.04); ctx.stroke(); continue; }
       ctx.fillStyle = p.color;
-      if (p.txt) { ctx.font = '700 18px "Bungee", monospace'; ctx.textAlign = "center"; ctx.fillText(p.txt, p.x, p.y); continue; }   // fox code glyphs
+      if (p.txt) { ctx.font = `700 ${p.size || 18}px "Bungee", "Noto Sans TC", monospace`; ctx.textAlign = "center"; ctx.fillText(p.txt, p.x, p.y); continue; }   // fox code glyphs
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -1545,14 +1551,12 @@
     }
     if (e.repeat) return;
     if (e.code === "KeyZ" || e.code === "Space" || e.code === "KeyJ") { e.preventDefault(); swing(); }
-    else if (e.code === "KeyX" || e.code === "KeyK") { e.preventDefault(); jump(); }
     else if (e.code === "KeyP" || e.code === "Escape") togglePause();
     else if (e.code === "Enter" && (phase === "intro" || phase === "over")) startMatch();
   });
   addEventListener("keyup", (e) => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
   document.querySelectorAll(".acts button").forEach((b) => {
-    const k = b.dataset.k;
-    const on = (e) => { e.preventDefault(); b.classList.add("on"); buzz(8); if (k === "jump") jump(); else swing(); };
+    const on = (e) => { e.preventDefault(); b.classList.add("on"); buzz(8); swing(); };
     const off = () => b.classList.remove("on");
     b.addEventListener("pointerdown", on); ["pointerup", "pointercancel", "pointerleave"].forEach((t) => b.addEventListener(t, off));
   });
