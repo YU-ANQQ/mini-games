@@ -430,6 +430,9 @@
   const LOSER_AWARDS = ["最佳沙包獎", "人體風箏獎", "空氣揮拍冠軍", "觀眾最愛出糗獎", "地板親密接觸獎"];
   const WINNER_AWARDS = ["墨鏡戴好獎", "物理學破壞者", "網球界的恐怖份子", "今天的主角"];
   let lastHitter = 0, bounces = 0, rally = 0, bestRally = 0, msg = "", msgT = 9, serveT = 0, tossT = -1, shake = 0, freeze = 0, flash = 0;
+  // camera punch on your own big hits: a quick zoom around the hit point — the "heavy" feel on iPhone / iPad, where vibration does nothing
+  const PUNCH_T = 0.09, PUNCH_ZOOM = 0.045;
+  let punch = { t: 0, x: 0, y: 0 };
   const keys = { left: false, right: false, up: false, down: false };
   const particles = [];
 
@@ -772,6 +775,7 @@
     }
     b.swing = 1; b.swingT = 0; b.charging = false; b.chargeT = 0;
     impact(hp.x, hp.y, power, color); if (b.side === 0) buzz(Math.round(12 + power * 45));   // phone haptics: only your own racket
+    if (b.side === 0 && power >= 0.85) punch = { t: PUNCH_T, x: hp.x, y: hp.y };   // perfect / smash / MAX / special
     if (quality === "perfect" && shot !== "smash") {                      // perfect: longer hit-stop, flash, second ring, bright chime
       freeze = Math.max(freeze, 0.13); flash = Math.max(flash, 0.3);
       rings.push({ x: hp.x, y: hp.y, r: 14, max: 170, life: 0.45, t: 0, color });
@@ -1525,6 +1529,7 @@
     ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
     ctx.clearRect(0, 0, W, H);
     if (shake > 0 && !reduceMotion) ctx.translate((Math.random() - 0.5) * 14 * shake, (Math.random() - 0.5) * 14 * shake);
+    if (punch.t > 0 && !reduceMotion) { const z = 1 + PUNCH_ZOOM * punch.t / PUNCH_T; ctx.translate(punch.x, punch.y); ctx.scale(z, z); ctx.translate(-punch.x, -punch.y); }
     const gray = gag.timeStopT > 0 ? "grayscale(1) contrast(1.1)" : "none";   // zap time stop: the world goes grey, only the stopper and the ball keep colour
     const colour = (f) => () => { ctx.filter = "none"; f(); ctx.filter = gray; };
     ctx.filter = gray;
@@ -1554,7 +1559,7 @@
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(1 / 30, (now - last) / 1000); last = now;
-    flash = Math.max(0, flash - dt * 1.5);
+    flash = Math.max(0, flash - dt * 1.5); punch.t = Math.max(0, punch.t - dt);   // punch runs through the hit-stop on purpose
     requestAnimationFrame(frame);                                         // schedule first: one bad frame must never stop the game
     try {
       if (freeze > 0) freeze -= dt;
