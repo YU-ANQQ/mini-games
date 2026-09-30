@@ -62,7 +62,7 @@
   .overlay li b { color: var(--text); font-weight: 700; }
   .overlay p { margin: 0; color: var(--dim); max-width: 38ch; line-height: 1.6; white-space: pre-line; }
   .overlay[data-mode="text"] { background: rgba(12, 14, 30, .9); }   /* result / pause: the big canvas texts must not bleed through */
-  .overlay[data-mode="text"] .rules, .overlay[data-mode="text"] .quick, .overlay:not([data-mode="text"]) p { display: none; }
+  .overlay[data-mode="text"] .rules, .overlay[data-mode="text"] .quick, .overlay[data-mode="text"] #replay, .overlay[data-mode="text"] .rotate, .overlay:not([data-mode="text"]) p { display: none; }   /* pause / result: no intro replay, no menu hints */
   .chars { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
   .chars button { font: inherit; font-size: 15px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
   .chars .lab { align-self: center; color: var(--dim); font-size: 13px; }
@@ -92,7 +92,7 @@
   .vstag { font-family: "Bungee", sans-serif; font-size: 24px; color: var(--accent); }
   #radar { width: 100%; max-width: 290px; justify-self: center; aspect-ratio: 560 / 440; }
   .select .chars { justify-content: flex-start; }
-  .overlay:not([data-mode="text"]) { place-content: start center; }       /* menu is taller than the stage: centring would clip the title (pause / result stay centred) */
+  .overlay:not([data-mode="text"]) { place-content: start center; padding-bottom: 72px; }   /* menu is taller than the stage: centring would clip the title (pause / result stay centred); bottom room so the sticky 開始比賽 doesn't cover the skill text */
   body:not(.touch) .overlay:not([data-mode="text"]) h2 { display: none; } /* desktop: the page header already shows the title (touch hides the header) */
   .overlay .play { position: sticky; bottom: 6px; z-index: 1; box-shadow: 0 4px 18px rgba(0,0,0,.5); }   /* 開始比賽 never scrolls out of reach */
   @media (max-width: 640px), (orientation: portrait) and (max-width: 820px) { .select { grid-template-columns: 1fr; } }
@@ -119,6 +119,8 @@
   .acts button { position: absolute; pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; border-radius: 50%;
     font: 700 22px "Noto Sans TC", sans-serif; color: var(--text); background: rgba(29,35,64,.35); border: 3px solid rgba(255,255,255,.45); }
   .acts .hit { width: 104px; height: 104px; right: 0; bottom: 0; font-size: 28px; background: rgba(246,196,83,.72); color: var(--accent-ink); border-color: #ffe08a; }
+  .acts .hit.smash { background: rgba(255,122,58,.9); border-color: #ffd6a0; font-size: 22px; }
+  .acts .hit.perfect { background: #ff4a1c; border-color: #fff; animation: pulse .18s infinite alternate; }
   .acts .hit.counter { background: rgba(143,244,255,.85); border-color: #fff; font-size: 22px; animation: pulse .35s infinite alternate; }
   @keyframes pulse { to { transform: scale(1.08); box-shadow: 0 0 24px #8ff4ff; } }
   .acts button.on { filter: brightness(1.35); transform: scale(.94); }
@@ -185,7 +187,6 @@
             <button type="button" data-who="me" aria-pressed="true">選自己</button><button type="button" data-who="opp" aria-pressed="false">選對手</button>
           </div>
           <div class="grid" id="grid" role="group" aria-label="角色"></div>
-          <div class="chars" id="courts" role="group" aria-label="選場地"></div>
           <div class="chars" id="sets" role="group" aria-label="選賽制"></div>
         </div>
         <div class="card">
@@ -207,7 +208,7 @@
         <ul>
           <li>跑到地上的<b>黃圈</b>按「打」。提早按＝<b>蓄力</b>（會多耗體力）。</li>
           <li>擊球時按住 <b>←→</b> 控制方向；高吊球、小球會隨機出現；邊跑邊打球會拐彎。</li>
-          <li>高球會出現紅色<b>扣殺點</b>：站進去按「打」會自動跳起<b>扣殺</b>；看到「跳！」時按，跳到最高點打到＝<b>完美扣殺</b>。</li>
+          <li>高球會出現紅色<b>扣殺點</b>：附近按「打」會自動飛撲<b>扣殺</b>（按鈕變「扣殺!」）；按鈕發亮、出現「扣殺！」時按＝<b>完美扣殺</b>。</li>
           <li><b>發球</b>：按一次拋球、最高點再按＝完美發球（上旋、切球隨機出現）。左右區每分輪流。</li>
           <li>集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。</li>
           <li>連續 3 次<b>完美擊球</b>＝<b>無我境界</b>：完美區變大、集氣加倍，丟分才解除。</li>
@@ -264,6 +265,8 @@
   const OT_LINES = ["我很帥，又會修電腦！", "今晚又要加班了！", "責任制啦！", "學妹的電腦今天一定要修完！", "爆肝模式啟動！", "修完電腦還要打球，我好忙"];
   // random shot kinds: the player's return is a lob / drop this often (no ↑↓ choice any more); the computer lobs AI_LOB of its returns (smash chances)
   const SHOT_LOB = 0.25, SHOT_DROP = 0.1, AI_LOB = 0.35;
+  const AI_BEAR_YEET = 0.25;
+  const POINT_HOLD = 0.7;             // share of the computer bear's MAX balls that knock the player away (every MAX did: 30% of its returns were a free point)
   const SERVE_SPINS = ["flat", "flat", "top", "slice"];                    // both sides' serve spin: random (no early / late choice)
   const AI_WALK = 0.5, AI_HOME_DEAD = 0.6;   // computer between shots: walks (half speed, half drain) back to the baseline centre, ignores < 0.6 m
   const TOSS_V = 6, APEX_OK = 0.08;     // serve toss speed; perfect-serve window (s) around the toss apex
@@ -273,16 +276,10 @@
     normal: { speed: 5.2, miss: 0.1,  err: 0.8, meter: 0.13, counter: 0.15 },
     hard:   { speed: 6.2, miss: 0.03, err: 0.35, meter: 0.16, counter: 0.25 },
   };
-  // courts: bounce height (kz) / bounce speed kept (kxy) multipliers, gravity multiplier, ice = players slide (momentum), colours
-  const COURTS = {
-    hard:  { name: "硬地", desc: "標準場地", kz: 1, kxy: 1, g: 1, ice: false, bg: "#24569a", out: "#2a62a6", in: "#2f6fb3" },
-    grass: { name: "草地", desc: "球彈很低又很快，偏好快攻", kz: 0.65, kxy: 1.08, g: 1, ice: false, bg: "#2d6a36", out: "#35803f", in: "#3f9449" },
-    clay:  { name: "紅土", desc: "球彈很高又變慢，適合長拉鋸", kz: 1.25, kxy: 0.78, g: 1, ice: false, bg: "#8a4a2c", out: "#a4583a", in: "#b9653f" },
-    ice:   { name: "冰原", desc: "地板超滑，停不下來", kz: 0.9, kxy: 1.05, g: 1, ice: true, bg: "#6f9fbf", out: "#a9d4ec", in: "#c8e6f6" },
-    moon:  { name: "月球", desc: "重力只有三分之一，球飄超久、跳超高", kz: 1, kxy: 1, g: 0.4, ice: false, bg: "#3a3a4a", out: "#5a5a6a", in: "#6e6e80" },
-  };
-  let courtId = "hard";
-  try { const c = localStorage.getItem("roo-seal-court"); if (c && COURTS[c]) courtId = c; } catch (e) {}
+  // one court. v40 removed 草地／紅土／冰原／月球: grass / clay only changed the bounce (flight identical, auto-hit absorbed it), the moon's
+  // same-flight-time arcs came out LOWER and killed smash spots, ice sliding hurt phone control (cross review 2026-10-01)
+  const COURTS = { hard: { name: "硬地", kz: 1, kxy: 1, g: 1, bg: "#24569a", out: "#2a62a6", in: "#2f6fb3" } };
+  const courtId = "hard";
   const court = () => COURTS[courtId];
   const POINT_NAMES = ["0", "15", "30", "40"];
   // match length (menu row 賽制, localStorage roo-seal-sets): games needed to win; 1 = one-game shoot-out (quick phone match)
@@ -302,7 +299,7 @@
                sp: { name: "破滅的輪舞曲！", speed: 30, rgb: "170,230,255", fx: "wobble", hurt: "球拍被打飛了！", stun: 1.6, racket: true }, trait: "slide", tdesc: "肚子滑行：飛撲滑超遠、馬上爬起來", stDrain: 1.0,
                draw: (c) => bodyPenguin(c) },
     cheetah: { name: "獵豹", speed: 10.5, jump: 4.8, reach: 1.4, dive: 3.2, power: 0.95, meter: 1.0, band: "#ff6a2a", tag: "最快、跳得低",
-               sp: { name: "那是殘像！音速球！", speed: 42, rgb: "255,220,110", fx: "none", hurt: "看不見！" }, trait: "burst", tdesc: "爆衝：體力七成以上快到出殘影，但超快喘", stDrain: 2.2,
+               sp: { name: "那是殘像！音速球！", speed: 42, rgb: "255,220,110", fx: "none", hurt: "看不見！" }, trait: "burst", tdesc: "爆衝：體力七成以上快到出殘影，但超快喘", stDrain: 1.6,
                draw: (c) => bodyCheetah(c) },
     seal:    { name: "海豹", speed: 6.0, jump: 4.4, reach: 1.5, dive: 3.0, power: 1.0,  meter: 1.0, band: "#7fe0ff", tag: "肚子滑行、冰旋球會凍住對手",
                sp: { name: "冰之世界！", speed: 17, rgb: "150,230,255", fx: "wobble", hurt: "凍、凍住了", freeze: true }, trait: "nose", tdesc: "鼻子頂球：每分 3 次自動救球", stDrain: 1.0,
@@ -377,7 +374,9 @@
   const ZEN_ROW = 3, ZEN_ZONE = 2, ZEN_METER = 2, ZEN_SPEED = 1.1;
   // phones: touch latency makes the 0.6 m window (~24 ms at 25 m/s) unreachable -> TOUCH_PERFECT_K wider; zone ring drawn from the same value
   const TOUCH_PERFECT_K = 1.5;
-  const perfZone = () => PERFECT_D * (touch ? TOUCH_PERFECT_K : 1) * (me().trait === "precise" ? PRECISE_K : 1) * (roo.zen ? ZEN_ZONE : 1);
+  // capped at PERFECT_CAP x reach: a zone as big as the reach (cap 1.56 > 1.45, touch zen 1.8) made every hit perfect, so every cap special was a super
+  const PERFECT_CAP = 0.85;
+  const perfZone = () => Math.min(me().reach * PERFECT_CAP, PERFECT_D * (touch ? TOUCH_PERFECT_K : 1) * (me().trait === "precise" ? PRECISE_K : 1) * (roo.zen ? ZEN_ZONE : 1));
   const COUNTER_LINES = ["還給你！", "退貨！", "無駄無駄無駄！", "反射！", "這招我收下了", "原封不動奉還", "本商品不接受退貨", "七天鑑賞期！", "原價奉還，發票不用"];
   const YEET_LINES = ["你還差得遠呢", "再見了您嘞～", "飛走囉～☆", "芭比Q了", "我好了", "Emotional Damage!", "這合理嗎？", "你沒事吧？", "物理學不存在了"];
   const EV_LINES = {                                                     // [winner lines, loser lines]
@@ -692,7 +691,7 @@
       lastHitter = b.side; bounces = 0; ball.netted = false; b.swing = 1; ball.power = 0;
       return;
     }
-    if (ball.rage) {                                                      // hulk rage ball: blown back, long stun
+    if (ball.rage && !calm(b)) {                                          // hulk rage ball: blown back, long stun (capybara: doesn't care)
       b.stun = Math.max(b.stun, 0.9); b.y = b.side === 1 ? Math.min(L + 2, b.y + 1.6) : Math.max(-2.8, b.y - 1.6);
       msg = "被震飛！"; msgT = 0; burst(hp.x, hp.y, 30, "#ff5a3c", 240, 0.6);
     }
@@ -705,9 +704,9 @@
     let speed = S.speed, depth = S.depth(), power = S.power;
     speed *= charOf(b.side).power;
     if (S.label) { msg = S.label; msgT = 0; }
-    if (shot === "smash" && quality === "perfect") { speed = 36; power = 1; msg = "完美扣殺！"; freeze = 0.2; }
+    if (shot === "smash" && quality === "perfect") { speed = Math.max(speed, Math.min(SMASH_MAX, Math.max(36, speed * 1.18))); power = 1; msg = "完美扣殺！"; freeze = 0.2; }   // never slower than this character's normal smash
     if (shot === "smash" && charOf(b.side).trait === "hi") speed *= 1.3;   // rabbit: smash king (after the perfect-smash override, so it stays faster)
-    else if (quality === "perfect") { speed *= 1.18; power = Math.max(power, 0.6); msg = S.label ? "完美" + S.label : "NICE!"; msgT = 0; }
+    else if (quality === "perfect" && shot !== "smash") { speed *= 1.18; power = Math.max(power, 0.6); msg = S.label ? "完美" + S.label : "NICE!"; msgT = 0; }
     if (quality === "dive") { speed *= 0.85; power = 0.45; }
     if (charge > 0) { speed *= 1 + 0.38 * charge; power = Math.max(power, 0.35 + 0.6 * charge); if (charge >= 0.95) { msg = "MAX!"; msgT = 0; } }
     let tx = clamp(aim * S.aimK + (Math.random() - 0.5) * 1.2, -HALF_W + 0.5, HALF_W - 0.5);
@@ -758,7 +757,7 @@
     lastHitter = b.side; bounces = 0; ball.netted = false; ball.t = 0; ball.power = power; ball.lastShot = shot;
     if (gag.pigeonT < 0 && ball.kind === "normal" && rally >= 3 && Math.random() < 0.05) { gag.pigeonT = 0; gag.pigeonDone = false; beep(500, 0.1, "triangle", 0.1, 0.5); }
     const ch = charOf(b.side), foe = b.side === 0 ? seal : roo;
-    if (ch.trait === "heavy" && charge >= 0.95 && ball.kind === "normal") { ball.heavy = true; ball.yeet = true; msg = pick(["熊掌全壘打！", "便當蓋！全壘打！"]); msgT = 0;
+    if (ch.trait === "heavy" && charge >= 0.95 && ball.kind === "normal") { ball.heavy = true; ball.yeet = b.side === 0 || Math.random() < AI_BEAR_YEET;   // computer bear: 30% of returns are MAX, only some knock you away msg = pick(["熊掌全壘打！", "便當蓋！全壘打！"]); msgT = 0;
       particles.push({ x: hp.x, y: hp.y, vx: (b.side === 0 ? 1 : -1) * 120, vy: -420, life: 1.1, max: 1.1, color: "#b8322a", grav: 700, r: 10 }); burst(hp.x, hp.y, 10, "#fff8ec", 160, 0.5); }   // bento lid + rice
     if (ch.trait === "rage" && b.rage && ball.kind === "normal") { ball.heavy = true; ball.rage = true; power = 1; color = "#ff5a3c"; msg = "暴怒重擊！"; msgT = 0; shake = 0.9; freeze = 0.25; rageRoar(hp); }
     if (ch.trait === "static" && quality === "perfect") {                 // electric mouse trait: perfect hit zaps the other side
@@ -833,7 +832,7 @@
       if (ball.kind === "sp" && ball.fx === "quake") {                   // hulk special: every bounce cracks the court and knocks down anyone near
         shake = Math.max(shake, 1); freeze = Math.max(freeze, 0.12); gag.cracks.push({ x: ball.x, y: ball.y, r: 0.8 + Math.random() * 0.5, a: Math.random() * 6 });
         beep(70, 0.5, "sawtooth", 0.22, -30); const cp = P(ball.x, ball.y); burst(cp.x, cp.y, 40, "#8a6a3a", 260, 0.7);
-        for (const v of [roo, seal]) if (v.side !== ball.owner && Math.hypot(v.x - ball.x, v.y - ball.y) < 6 && v.z <= 0) { v.stun = Math.max(v.stun, 1.4); v.koT = Math.max(v.koT, 1.2); say(v, "地震啦——"); }
+        for (const v of [roo, seal]) if (v.side !== ball.owner && !calm(v) && Math.hypot(v.x - ball.x, v.y - ball.y) < 6 && v.z <= 0) { v.stun = Math.max(v.stun, 1.4); v.koT = Math.max(v.koT, 1.2); say(v, "地震啦——"); }
       }
       if (ball.kind === "sp" && ball.fx === "onsen" && bounces === 0) {     // capybara special: a hot spring opens where it lands
         gag.onsen = { x: ball.x, y: ball.y, side: ball.y < NET_Y ? 0 : 1, t: ONSEN_T }; const op = P(ball.x, ball.y); burst(op.x, op.y, 30, "#bdf3ff", 200, 0.7); beep(260, 0.4, "sine", 0.15, -0.4);
@@ -852,7 +851,8 @@
     }
     if (phase !== "rally") return;                                        // ball keeps rolling after a point, but nobody hits it
     // kangaroo: hits during a swing, a charged swing (auto-releases in reach) or a dive
-    if ((roo.swingT > 0 || roo.charging || roo.diveT > 0) && lastHitter === 1 && ball.y < NET_Y + 0.5) {
+    // frozen (time stop, ice) only pins your feet: a ball that comes into reach can still be hit / countered. Stunned or collapsed: no hit, charged or not
+    if ((roo.swingT > 0 || roo.charging || roo.diveT > 0) && lastHitter === 1 && ball.y < NET_Y + 0.5 && roo.stun <= 0 && roo.koT <= 0) {
       const d = Math.hypot(ball.x - roo.x, ball.y - roo.y), reach = me().reach * (roo.diveT > 0 ? 1.25 : roo.z > 0.15 ? SMASH_REACH : 1);
       if (d < reach && inReachZ()) {
         const aim = keys.left ? -1 : keys.right ? 1 : 0, r = Math.random();     // shot kind is random (↑↓ only move): holding a direction while hitting was too fiddly on phones
@@ -865,7 +865,7 @@
       }
     }
     // seal: swings automatically when in reach (unless it decided to whiff this one)
-    if (lastHitter === 0 && ball.y > NET_Y - 0.5 && seal.stun <= 0 && seal.frozen <= 0) {
+    if (lastHitter === 0 && ball.y > NET_Y - 0.5 && seal.stun <= 0 && seal.koT <= 0) {   // frozen may still swing, like the player
       const d = Math.hypot(ball.x - seal.x, ball.y - seal.y);
       const air = seal.z > 0.15, reach = opp().reach * 0.95 * (air ? SMASH_REACH : 1);
       if (d < reach && ball.z < REACH_Z + seal.z * 1.6 && ball.z > seal.z - 0.3 && !seal.willMiss) {
@@ -916,8 +916,7 @@
     if (ch.trait === "burst" && b.st > 0.7) speed *= 1.35;
     const len = Math.hypot(ix, iy) || 1;
     const tvx = ix / len * speed * Math.min(1, Math.hypot(ix, iy)), tvy = iy / len * speed * Math.min(1, Math.hypot(ix, iy));
-    if (court().ice) { const k = Math.min(1, dt * 1.8); b.vx += (tvx - b.vx) * k; b.vy += (tvy - b.vy) * k; }   // ice: momentum, hard to stop
-    else { b.vx = tvx; b.vy = tvy; }
+    b.vx = tvx; b.vy = tvy;
     b.x = clamp(b.x + b.vx * dt, -6.2, 6.2);
     b.y = b.side === 0 ? clamp(b.y + b.vy * dt, -2.8, NET_Y - 1) : clamp(b.y + b.vy * dt, NET_Y + 1, L + 3.2);
     b.hop = Math.hypot(b.vx, b.vy) > 0.5 ? b.hop + dt * 13 : 0;
@@ -1005,20 +1004,20 @@
     if (phase === "over" && (overlay.hidden || performance.now() - overShownAt < 1200)) return;   // mashing 打 must not skip the result screen
     if (phase === "intro" || phase === "over") { startMatch(); return; }
     if (phase === "paused") { togglePause(); return; }
-    if (phase === "point") { msgT = Math.max(msgT, 1.5); return; }        // skip the blooper / taunt pause
+    if (phase === "point") { if (msgT > POINT_HOLD) msgT = Math.max(msgT, 1.5); return; }   // skip the blooper / taunt pause, but not the first POINT_HOLD s (phones mash 打)
     if (phase === "serve") {                                              // 1st press tosses, 2nd press hits: timing = serve quality
       if (score.server !== 0) return;
       if (tossT < 0) { tossT = 0; beep(600, 0.08, "sine", 0.06, 1.4); return; }
       const off = Math.abs(tossT - TOSS_V / G);                            // timing = serve quality; spin is random, like the computer's serve
       doServe(off < APEX_OK ? "perfect" : off < 0.22 ? "good" : "weak", keys.left ? -1 : keys.right ? 1 : 0, pick(SERVE_SPINS)); return;
     }
-    if (phase !== "rally" || roo.swingCd > 0 || roo.frozen > 0 || roo.stun > 0 || roo.diveT > 0 || roo.recover > 0) return;
+    if (phase !== "rally" || roo.swingCd > 0 || roo.stun > 0 || roo.koT > 0 || roo.diveT > 0 || roo.recover > 0) return;   // frozen: feet pinned, racket free
     const incoming = lastHitter === 1 && !ball.netted && bounces < 2;
     const d = Math.hypot(ball.x - roo.x, ball.y - roo.y);
     roo.swing = 1; roo.swingAgo = 0;
     if (incoming && !roo.z && smashReady()) {                             // smash spot: 打 jumps by itself; hit at the top of the jump = perfect smash
       const spot = smashSpot(); roo.charging = false; roo.chargeT = 0;
-      roo.smashQ = Math.abs(spot.t - me().jump / G) < SMASH_CUE ? "perfect" : "good";   // pressed while "跳！" shows = perfect smash
+      roo.smashQ = Math.abs(spot.t - me().jump / G) < SMASH_CUE ? "perfect" : "good";   // pressed while "扣殺！" shows = perfect smash
       jump(); roo.vz = Math.min(roo.vz, Math.sqrt(2 * G * Math.max(0.4, spot.z - 0.2)));   // never overshoot: a rabbit-high leap sails over the ball
       const up = roo.vz / G; roo.vx = (spot.x - roo.x) / up; roo.vy = (spot.y - roo.y) / up;   // leap toward the spot, arriving at the top of the jump
       roo.swingT = 2 * up + 0.05; roo.swingCd = 0.3; return;               // racket stays ready until landing
@@ -1041,11 +1040,17 @@
     roo.vz = me().jump * (0.85 + 0.15 * roo.st); roo.z = 0.001; roo.st = Math.max(0, roo.st - ST_JUMP * (roo.rage ? 2 : 1)); beep(420, 0.12, "sine", 0.08, 1.6);
     const p = P(roo.x, roo.y); burst(p.x, p.y, 6, "rgba(200,215,240,.8)", 80, 0.3, 150);
   }
-  // smash spot close enough and the ball not too far off: pressing 打 now jumps. SMASH_EARLY: s of slack before the "跳！" cue (early press = hit on the way down = good)
+  // smash spot close enough and the ball not too far off: pressing 打 now jumps. SMASH_EARLY: s of slack before the "扣殺！" cue (early press = hit on the way down = good)
   // SMASH_DETECT: smash-spot radius x the airborne reach — computer lobs put the spot ~4.5 m in front of a baseline player, so at x1 (~2.2 m)
   // you had to sprint forward first (0/10 from the baseline); at x2.5 打 from near the baseline leaps there. SPRING_K: kangaroo on top
-  const SMASH_EARLY = 0.35, SMASH_CUE = 0.15, SMASH_DETECT = 2.5, SPRING_K = 1.3;             // SMASH_CUE: ± s around the jump-to-apex time = "跳！" cue = perfect window                                // SPRING_K: kangaroo (trait spring) smash-spot radius x
-  const smashR = () => me().reach * SMASH_REACH * SMASH_DETECT * (me().trait === "spring" ? SPRING_K : 1);
+  const SMASH_EARLY = 0.35, SMASH_CUE = 0.15, SMASH_DETECT = 2.5, SPRING_K = 1.3, HI_SMASH_K = 1.5, SMASH_MAX = 46;
+  // SMASH_CUE: ± s around the jump-to-apex time = the "扣殺！" cue = perfect window; SPRING_K / HI_SMASH_K: kangaroo / rabbit smash-spot radius x; SMASH_MAX: perfect smash cap
+  const smashR = () => me().reach * SMASH_REACH * SMASH_DETECT * (me().trait === "spring" ? SPRING_K : me().trait === "hi" ? HI_SMASH_K : 1);
+  // "" | "smash" (打 now leaps to the spot) | "perfect" (inside the cue window): drives the 打 button, the cue text and the portrait tray hint
+  function smashState() {
+    if (phase !== "rally" || roo.z > 0 || roo.stun > 0 || roo.koT > 0 || !smashReady()) return "";
+    return Math.abs(smashSpot().t - me().jump / G) < SMASH_CUE ? "perfect" : "smash";
+  }
   function smashReady() {
     const spot = smashSpot();
     return !!spot && Math.hypot(spot.x - roo.x, spot.y - roo.y) < smashR() && spot.t < me().jump / G + SMASH_EARLY;
@@ -1074,9 +1079,8 @@
   function line(x1, y1, x2, y2) { const a = P(x1, y1), b = P(x2, y2); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
   function drawCourt() {
     const sky = ctx.createLinearGradient(0, 0, 0, 110);
-    sky.addColorStop(0, courtId === "moon" ? "#05060f" : "#1d2550"); sky.addColorStop(1, courtId === "moon" ? "#1b1d33" : "#b25f63");
+    sky.addColorStop(0, "#1d2550"); sky.addColorStop(1, "#b25f63");
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 110);
-    if (courtId === "moon") { ctx.fillStyle = "#fff"; for (let i = 0; i < 40; i++) ctx.fillRect((i * 97) % W, (i * 37) % 58, 2, 2); E("#3a7bd5", W - 90, 34, 20, 20); E("#4caf50", W - 94, 30, 8, 6); }   // stars + Earth
     ctx.fillStyle = "#2a2146"; ctx.fillRect(0, 60, W, 50);
     const wild = gag.crowd === "wild" && gag.crowdT < 2, boo = gag.crowd === "boo" && gag.crowdT < 2;
     const cheer = phase === "rally" && rally >= 6, t = performance.now() / 1000;
@@ -1171,9 +1175,7 @@
       if (perf) { ctx.fillStyle = "rgba(143,244,255,.25)"; ctx.beginPath(); ctx.ellipse(g0.x, g0.y + 2, pr * K * g0.s, pr * K * g0.s * 0.28, 0, 0, Math.PI * 2); ctx.fill(); }
       ctx.beginPath(); ctx.ellipse(g0.x, g0.y + 2, pr * K * g0.s, pr * K * g0.s * 0.28, 0, 0, Math.PI * 2); ctx.stroke();
       if (ok) { ctx.fillStyle = perf ? "#8ff4ff" : "#ffd65a"; ctx.fillText(b.z > 0 && ball.z > 2 ? "SMASH!" : perf ? "NICE!" : "HIT!", p.x, p.y - 190 * s); }
-      else if (!b.z && spot && Math.hypot(spot.x - b.x, spot.y - b.y) < smashR() && Math.abs(spot.t - me().jump / G) < SMASH_CUE) {
-        ctx.fillStyle = "#ff7a5a"; ctx.fillText("跳！", p.x, p.y - 190 * s);
-      }
+      else if (smashState() === "perfect") { ctx.font = `400 ${touch ? 26 : 18}px "Bungee", "Noto Sans TC", sans-serif`; ctx.fillStyle = "#ff7a5a"; ctx.fillText("扣殺！", p.x, p.y - 190 * s); }
     }
     if (b.charging) {                                                  // charge aura grows until MAX
       const c = Math.min(1, b.chargeT / 0.9), t = performance.now() / 1000, full = c >= 1;
@@ -1396,11 +1398,11 @@
   function drawLandingMark() {
     const sp = smashSpot();                                               // red ring on the ground = stand here and jump
     if (sp) {
-      const q = P(sp.x, sp.y), t = performance.now() / 150;
-      ctx.strokeStyle = "rgba(255,90,60,.9)"; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.ellipse(q.x, q.y, (24 + Math.sin(t) * 3) * q.s, (8 + Math.sin(t)) * q.s, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.font = '700 13px "Noto Sans TC", sans-serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillStyle = "rgba(20,10,20,.55)"; roundRect(q.x - 24, q.y - 9, 48, 18, 8); ctx.fill(); ctx.fillStyle = "#ffb0a0"; ctx.fillText("扣殺點", q.x, q.y);
+      const q = P(sp.x, sp.y), t = performance.now() / 150, u = touch ? SPOT_TOUCH : 1, on = smashState() !== "";   // phones: the canvas shrinks to 40-65%
+      ctx.strokeStyle = on ? "rgba(255,120,60,1)" : "rgba(255,90,60,.9)"; ctx.lineWidth = (on ? 5 : 3) * u;
+      ctx.beginPath(); ctx.ellipse(q.x, q.y, (24 + Math.sin(t) * 3) * q.s * u, (8 + Math.sin(t)) * q.s * u, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.font = `700 ${13 * u}px "Noto Sans TC", sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(20,10,20,.6)"; roundRect(q.x - 24 * u, q.y - 9 * u, 48 * u, 18 * u, 8 * u); ctx.fill(); ctx.fillStyle = "#ffb0a0"; ctx.fillText("扣殺點", q.x, q.y);
     }
     if (phase !== "rally" || lastHitter !== 1 || !ball.live || ball.netted || bounces > 0 || ballHidden()) return;
     const pr = predict(0); if (!pr.land || pr.land.y > NET_Y) return;
@@ -1427,11 +1429,13 @@
     ctx.fillStyle = armed ? "#ffffff" : color; roundRect(x - 50, y, Math.max(7, 100 * v), 7, 4); ctx.fill();
   }
   // HUD_TOUCH: on phones the 960-wide canvas shrinks to ~40-65%, so the score panel and the call-outs are drawn bigger
-  const HUD_TOUCH = 1.3;
+  const HUD_TOUCH = 1.3, SPOT_TOUCH = 1.8;                               // SPOT_TOUCH: smash-spot ring / label on phones (13 px label was ~5–8 px on screen)
   function drawHUD() {
     const U = touch ? HUD_TOUCH : 1, tray = trayOn();                      // portrait phone: score, bars and hints live in the DOM tray under the court
     if (!tray) {
     ctx.save(); ctx.translate(W / 2, 0); ctx.scale(U, U); ctx.translate(-W / 2, 0);   // score panel, scaled around the top centre
+    const bp = ball.live && phase === "rally" ? P(ball.x, ball.y, ball.z) : null;
+    if (bp && Math.abs(bp.x - W / 2) < 240 * U && bp.y < 106 * U) ctx.globalAlpha = 0.3;   // a high lob flies behind the panel: see through it
     ctx.fillStyle = "rgba(14,17,34,.8)"; roundRect(W / 2 - 220, 10, 440, 86, 10); ctx.fill();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = '500 14px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#a9b0cf";
@@ -1449,8 +1453,8 @@
     ctx.fillStyle = "#f3f1ea"; ctx.font = '400 20px "Bungee", "Noto Sans TC", sans-serif'; ctx.fillText(pointLabel(), W / 2, 40);
     const mp = phase === "serve" || phase === "rally" ? matchPointSide() : -1;
     if (mp >= 0) {                                                        // match point tag, pulsing on the side that can finish it
-      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(performance.now() / 120); ctx.font = '700 13px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#ff5a4a";
-      ctx.fillText("賽點", mp === 0 ? W / 2 - 60 : W / 2 + 60, 40); ctx.globalAlpha = 1;
+      const ga = ctx.globalAlpha; ctx.globalAlpha = ga * (0.6 + 0.4 * Math.sin(performance.now() / 120)); ctx.font = '700 13px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#ff5a4a";
+      ctx.fillText("賽點", mp === 0 ? W / 2 - 60 : W / 2 + 60, 40); ctx.globalAlpha = ga;
     }
     ctx.font = '500 12px "Noto Sans TC", sans-serif'; ctx.fillStyle = "#a9b0cf"; ctx.fillText(score.server === 0 ? "● " + me().name + "發球" : opp().name + "發球 ●", W / 2, 66);
     if (phase === "serve") { ctx.fillStyle = "#f6c453"; ctx.fillText(serveCourt() === "right" ? "右區發球" : "左區發球", W / 2, 80); }
@@ -1490,7 +1494,7 @@
       E("#ff9a1f", q.x, q.y, r, r * 0.9); E("#3fae4a", q.x + r * 0.3, q.y - r, r * 0.45, r * 0.2, -0.4);
     }
     if (gag.bsodT > 0) {                                                   // fox super: the other half of the court blue-screens
-      gag.bsodT -= 1 / 60; const ny = P(0, NET_Y).y, y0 = gag.bsodSide === 1 ? 0 : ny, y1 = gag.bsodSide === 1 ? ny : H;   // screen rectangle: that whole half, player included
+      const ny = P(0, NET_Y).y, y0 = gag.bsodSide === 1 ? 0 : ny, y1 = gag.bsodSide === 1 ? ny : H;   // screen rectangle: that whole half, player included
       ctx.globalAlpha = Math.min(1, gag.bsodT * 2) * 0.94; ctx.fillStyle = "#0a5fc4"; ctx.fillRect(0, y0, W, y1 - y0); ctx.globalAlpha = Math.min(1, gag.bsodT * 2);
       const tx = W / 2 - 200, ty = gag.bsodSide === 1 ? ny - 70 : (y0 + y1) / 2 + 40; ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
       ctx.font = '400 72px "Noto Sans TC", sans-serif'; ctx.fillText(":(", tx, ty - 24);
@@ -1498,7 +1502,7 @@
       ctx.font = '400 18px "Noto Sans TC", sans-serif'; ctx.fillText(`已完成 ${Math.min(100, Math.round((1 - gag.bsodT / BSOD_T) * 100))}%`, tx, ty + 50); ctx.globalAlpha = 1;
     }
     if (gag.bolt && gag.bolt.t > 0) {                                        // electric mouse static: zigzag bolt, re-jittered every frame
-      const b = gag.bolt; b.t -= 1 / 60; ctx.strokeStyle = "#fff27a"; ctx.lineWidth = 4; ctx.shadowColor = "#fff27a"; ctx.shadowBlur = 12; ctx.beginPath(); ctx.moveTo(b.x1, b.y1);
+      const b = gag.bolt; ctx.strokeStyle = "#fff27a"; ctx.lineWidth = 4; ctx.shadowColor = "#fff27a"; ctx.shadowBlur = 12; ctx.beginPath(); ctx.moveTo(b.x1, b.y1);
       for (let k = 1; k < 8; k++) { const f = k / 8; ctx.lineTo(b.x1 + (b.x2 - b.x1) * f + (Math.random() - 0.5) * 26, b.y1 + (b.y2 - b.y1) * f + (Math.random() - 0.5) * 26); }
       ctx.lineTo(b.x2, b.y2); ctx.stroke(); ctx.shadowBlur = 0;
     }
@@ -1530,7 +1534,7 @@
     const items = [{ y: seal.y, d: who(seal) }, { y: NET_Y, d: drawNet }, { y: roo.y, d: who(roo) }, { y: phase === "serve" ? (score.server === 0 ? roo.y - 0.01 : seal.y - 0.01) : ball.y - 0.01, d: colour(drawBall) }];
     items.sort((a, b) => b.y - a.y).forEach((i) => i.d());
     ctx.filter = "none";
-    drawParticles(); drawGags(); drawBubble(seal); drawBubble(roo);
+    drawParticles(); drawGags(); drawBubble(roo);
     if (roo.zen && !reduceMotion) {                                         // zen: manga speed lines from the screen edges
       const t = performance.now() / 70; ctx.strokeStyle = "rgba(255,225,140,.35)"; ctx.lineWidth = 2;
       for (let i = 0; i < 28; i++) {
@@ -1538,7 +1542,7 @@
         ctx.beginPath(); ctx.moveTo(W / 2 + Math.cos(a) * r0, H / 2 + Math.sin(a) * r0 * 0.62); ctx.lineTo(W / 2 + Math.cos(a) * r1, H / 2 + Math.sin(a) * r1 * 0.62); ctx.stroke();
       }
     }
-    drawHUD();
+    drawHUD(); drawBubble(seal);                                            // far taunts sit up by the score panel: drawn after it so they aren't cut
     if (gag.timeStopT > 0) {                                                // zap time stop: world goes grey-sepia
       ctx.fillStyle = "rgba(90,70,140,.18)"; ctx.fillRect(0, 0, W, H);   // light tint: the grey filter does the heavy lifting
       ctx.font = '400 28px "Bungee", "Noto Sans TC", sans-serif'; ctx.textAlign = "center"; ctx.fillStyle = "#fff27a"; ctx.fillText(gag.timeStopBy === 0 ? "世界只有我在動" : "時間停止中…", 170, 150 + Math.sin(performance.now() / 80) * 3);
@@ -1560,7 +1564,12 @@
       if (touch) {
         const cover = !overlay.hidden || !introEl.hidden; padEl.classList.toggle("off", cover); pauseEl.hidden = cover;
         trayEl.hidden = cover; if (trayOn() && !cover) updateTray();   // the tray (z 5) would sit on top of the menu's start button
-        const cnt = counterChance(); if (hitEl.classList.contains("counter") !== cnt) { hitEl.classList.toggle("counter", cnt); hitEl.textContent = cnt ? "退貨!" : "打"; }
+        const st = counterChance() ? "counter" : smashState();              // 打 turns into 退貨! / 扣殺! (and glows in the perfect-smash window)
+        if (hitEl.dataset.st !== st) {
+          if (st === "perfect") buzz(15);
+          hitEl.dataset.st = st; hitEl.textContent = st === "counter" ? "退貨!" : st ? "扣殺!" : "打";
+          for (const c of ["counter", "smash", "perfect"]) hitEl.classList.toggle(c, st === c || (c === "smash" && st === "perfect"));
+        }
       }
     } catch (e) { console.error(e); ctx.setTransform(1, 0, 0, 1, 0, 0); }
   }
@@ -1576,6 +1585,7 @@
       if (gag.pigeonT > 1.6) gag.pigeonT = -1;
     }
     if (gag.onsen) gag.onsen.t -= dt; if (gag.onsenAll) gag.onsenAll.t -= dt;
+    if (gag.bsodT > 0) gag.bsodT -= dt; if (gag.bolt) gag.bolt.t -= dt;    // effect timers on game time (render-time -1/60 ran during pause and doubled speed at 120 Hz)
     stepRoo(dt); stepSeal(dt); stepParticles(dt);
     if (phase === "serve") {
       serveT += dt;
@@ -1648,7 +1658,9 @@
     const mp = phase === "serve" || phase === "rally" ? matchPointSide() : -1;
     setT("pts", pointLabel());
     setT("srv", (mp === 0 ? "賽點！" : mp === 1 ? "對手賽點！" : "") + (mp >= 0 ? "\n" : "") + (score.server === 0 ? me().name : opp().name) + "發球" + (phase === "serve" ? "・" + (serveCourt() === "right" ? "右區" : "左區") : ""));
+    const sm = smashState();
     const hint = counterChance() ? "提早按「打」蓄力或完美擊球＝退貨！"
+      : sm ? (sm === "perfect" ? "現在按「打」＝完美扣殺！" : "按「打」飛撲扣殺！")
       : phase === "serve" && score.server === 0 ? (tossT < 0 ? "按「打」拋球" : "球在最高點時再按一次！")
       : roo.armed ? `下一球自動必殺！
 超必殺：${SUPERS[charId].hint}`
@@ -1659,7 +1671,7 @@
   const padEl = document.getElementById("pad"), pauseEl = document.getElementById("pausebtn");
   if (touch) overlay.insertBefore(document.querySelector(".opts"), document.getElementById("ov-btn"));   // header is hidden in touch mode: difficulty / sound / 重選角色 live in the menu (and the pause screen)
   const selectEl = document.getElementById("select"), gridEl = document.getElementById("grid"), radarEl = document.getElementById("radar");
-  const courtsEl = document.getElementById("courts"), setsEl = document.getElementById("sets"), cstat = document.getElementById("cstat");
+  const setsEl = document.getElementById("sets"), cstat = document.getElementById("cstat");
   const OPP_IDS = [...Object.keys(CHARS), "random"];
   let pickWho = "me";                                                     // which side the portrait grid is choosing for
   for (const bt of document.querySelectorAll(".who button")) bt.addEventListener("click", () => { pickWho = bt.dataset.who; renderChars(); });
@@ -1719,10 +1731,10 @@
       f.querySelector("figcaption").innerHTML = id === "random" ? "<b>隨機</b><small>開賽時抽</small>" : `<b>${CHARS[id].name}</b><small>${CHARS[id].tag}</small>`;
     }
     drawRadar();
-    optRow(courtsEl, "場地", Object.keys(COURTS).map((id) => [id, COURTS[id].name]), (id) => id === courtId, (id) => { courtId = id; try { localStorage.setItem("roo-seal-court", id); } catch (e) {} renderChars(); });
     optRow(setsEl, "賽制", Object.keys(SETS).map((n) => [n, SETS[n]]), (n) => +n === gamesToWin, (n) => { gamesToWin = +n; try { localStorage.setItem("roo-seal-sets", n); } catch (e) {} renderChars(); });
-    const c = me();
-    cstat.innerHTML = `<b>特技</b>　${c.tdesc}\n<b>必殺</b>　${c.sp.name.replace("！", "")}　<b>超必殺</b>　${SUPERS[charId].hint}\n<b>場地</b>　${court().name}：${court().desc}`;
+    const cid = pickWho === "me" ? charId : oppShown, c = CHARS[cid];       // the text follows the side being picked
+    cstat.innerHTML = !c ? "<b>對手</b>　開賽時隨機抽一隻"
+      : `<b>${pickWho === "me" ? "你的" : "對手的"}特技</b>　${c.tdesc}\n<b>必殺</b>　${c.sp.name.replace("！", "")}　<b>超必殺</b>　${SUPERS[cid].hint}`;
   }
   const inMenu = () => phase === "intro" || phase === "over";               // characters only change between matches
   function setChar(id) { if (!inMenu()) return; charId = id; try { localStorage.setItem("roo-seal-char", id); } catch (e) {} renderChars(); }
@@ -1745,7 +1757,7 @@
   }
   function togglePause() {
     if (phase === "paused") { phase = pausedFrom; overlay.hidden = true; if (clipEl.classList.contains("on")) clipEl.play().catch(() => {}); }
-    else if (phase === "serve" || phase === "rally" || phase === "point") { pausedFrom = phase; phase = "paused"; clipEl.pause(); showOverlay("暫停中", touch ? "按下方按鈕繼續。" : "按 P 或下方按鈕繼續。", "繼續"); }
+    else if (phase === "serve" || phase === "rally" || phase === "point") { pausedFrom = phase; phase = "paused"; clipEl.pause(); showOverlay("暫停中", touch ? "按「繼續」回到比賽。" : "按 P 或「繼續」回到比賽。", "繼續"); }
   }
   ovBtn.addEventListener("click", () => { if (phase === "paused") togglePause(); else startMatch(); });
   document.addEventListener("visibilitychange", () => { if (document.hidden && (phase === "serve" || phase === "rally" || phase === "point")) togglePause(); });
