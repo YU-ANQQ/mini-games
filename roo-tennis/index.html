@@ -49,7 +49,7 @@
   #intro { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; z-index: 5; cursor: pointer; }
   .overlay.welcome:not([data-mode="text"]) { background: linear-gradient(rgba(12,14,30,.15), rgba(12,14,30,.75) 45%), var(--welcome) center / cover; }
   .stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden; background: #1b2a55; touch-action: none; user-select: none; -webkit-user-select: none; }
-  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }   /* the game canvas only: menu portraits / radar are canvases too */
   .overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; overflow-y: auto; background: rgba(12, 14, 30, .7); text-align: center; padding: 16px; }
   .overlay[hidden] { display: none; }
   [hidden] { display: none !important; }                          /* .chars / .cstat set display, which would beat the hidden attribute */
@@ -67,7 +67,35 @@
   .chars button { font: inherit; font-size: 15px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
   .chars .lab { align-self: center; color: var(--dim); font-size: 13px; }
   .chars button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
-  .cstat { color: var(--dim); font-size: 13px; min-height: 1.4em; white-space: pre-line; }
+  .cstat { color: var(--dim); font-size: 13px; min-height: 1.4em; white-space: pre-line; line-height: 1.55; }
+  .cstat b { color: var(--text); }
+  /* character select: portrait grid (left) + VS card with the stats radar (right); one column on narrow / portrait screens */
+  .select { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px 18px; width: min(920px, 100%); align-items: start; text-align: left; }
+  .pickcol, .card { display: grid; gap: 8px; min-width: 0; }
+  .card { background: rgba(20, 24, 43, .78); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+  .who { display: inline-flex; justify-self: start; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: rgba(20, 24, 43, .7); }
+  .who button { font: inherit; font-size: 14px; color: var(--text); background: transparent; border: 0; padding: 6px 18px; cursor: pointer; }
+  .who button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 6px; }
+  .tile { position: relative; display: grid; justify-items: center; gap: 1px; font: inherit; font-size: 13px; color: var(--text); background: rgba(29, 35, 64, .88);
+    border: 2px solid var(--line); border-radius: 12px; padding: 4px 2px 5px; cursor: pointer; white-space: nowrap; }
+  .tile canvas { width: 58px; height: 58px; }
+  .tile:hover { border-color: var(--dim); }
+  .tile[aria-pressed="true"] { border-color: var(--accent); background: rgba(246, 196, 83, .2); }
+  .tile .tag { position: absolute; top: 3px; font-size: 10px; font-weight: 700; line-height: 1.5; padding: 0 5px; border-radius: 6px; }
+  .tile .tag.me { left: 4px; background: #ffb347; color: #241a08; } .tile .tag.cpu { right: 4px; background: #6fd3ff; color: #06202b; }
+  .vs { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 4px; }
+  .vs figure { margin: 0; display: grid; justify-items: center; gap: 2px; text-align: center; min-width: 0; }
+  .vs canvas { width: 84px; height: 84px; }
+  .vs figcaption b { display: block; font-size: 16px; } .vs figcaption small { display: block; color: var(--dim); font-size: 11px; line-height: 1.35; }
+  #vs-me figcaption b { color: #ffb347; } #vs-opp figcaption b { color: #6fd3ff; }
+  .vstag { font-family: "Bungee", sans-serif; font-size: 24px; color: var(--accent); }
+  #radar { width: 100%; max-width: 290px; justify-self: center; aspect-ratio: 560 / 440; }
+  .select .chars { justify-content: flex-start; }
+  .overlay:not([data-mode="text"]) { place-content: start center; }       /* menu is taller than the stage: centring would clip the title (pause / result stay centred) */
+  body:not(.touch) .overlay:not([data-mode="text"]) h2 { display: none; } /* desktop: the page header already shows the title (touch hides the header) */
+  .overlay .play { position: sticky; bottom: 6px; z-index: 1; box-shadow: 0 4px 18px rgba(0,0,0,.5); }   /* 開始比賽 never scrolls out of reach */
+  @media (max-width: 640px), (orientation: portrait) and (max-width: 820px) { .select { grid-template-columns: 1fr; } }
   .play { font: inherit; font-weight: 700; font-size: 18px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; padding: 12px 28px; cursor: pointer; }
   .play:hover { filter: brightness(1.08); }
   /* touch mode (body.touch, set by JS from pointer: coarse / narrow screen): the stage fills the screen,
@@ -151,11 +179,25 @@
     <div class="overlay" id="overlay">
       <h2 id="ov-title">網球大亂鬥</h2>
       <p id="ov-text"></p>
-      <div class="chars" id="chars" role="group" aria-label="選角色"></div>
-      <div class="chars" id="opps" role="group" aria-label="選對手"></div>
-      <div class="chars" id="courts" role="group" aria-label="選場地"></div>
-      <div class="chars" id="sets" role="group" aria-label="選賽制"></div>
-      <div class="cstat" id="cstat"></div>
+      <div class="select" id="select">
+        <div class="pickcol">
+          <div class="who" role="group" aria-label="要選誰">
+            <button type="button" data-who="me" aria-pressed="true">選自己</button><button type="button" data-who="opp" aria-pressed="false">選對手</button>
+          </div>
+          <div class="grid" id="grid" role="group" aria-label="角色"></div>
+          <div class="chars" id="courts" role="group" aria-label="選場地"></div>
+          <div class="chars" id="sets" role="group" aria-label="選賽制"></div>
+        </div>
+        <div class="card">
+          <div class="vs">
+            <figure id="vs-me"><canvas width="168" height="168"></canvas><figcaption></figcaption></figure>
+            <span class="vstag">VS</span>
+            <figure id="vs-opp"><canvas width="168" height="168"></canvas><figcaption></figcaption></figure>
+          </div>
+          <canvas id="radar" width="560" height="440" role="img" aria-label="能力比較圖"></canvas>
+          <div class="cstat" id="cstat"></div>
+        </div>
+      </div>
       <button type="button" class="play" id="ov-btn">開始比賽</button>
       <div class="rotate touchonly">↻ 手機橫放更好玩</div>
       <div class="quick"><span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打</span><span class="touch">左邊移動，右邊「打」</span></div>
@@ -357,7 +399,8 @@
     return { x: W / 2 + x * K * s, y: SCR_NEAR - t * (SCR_NEAR - SCR_FAR) - z * K * s, s };
   }
 
-  const canvas = document.getElementById("c"), ctx = canvas.getContext("2d");
+  const canvas = document.getElementById("c");
+  let ctx = canvas.getContext("2d");                                      // let: portrait() borrows the game's draw functions for the menu cards
   const overlay = document.getElementById("overlay"), ovTitle = document.getElementById("ov-title"),
         ovText = document.getElementById("ov-text"), ovBtn = document.getElementById("ov-btn");
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1268,7 +1311,7 @@
   // friends: full-body sprites (ready / swing frames) generated from photos; SPRITE_SRC data URIs live at the end of the file
   const spriteImgs = {};
   function spriteImg(id) {
-    if (!spriteImgs[id] && window.HEAD_SRC && window.HEAD_SRC[id]) { spriteImgs[id] = new Image(); spriteImgs[id].src = window.HEAD_SRC[id]; }
+    if (!spriteImgs[id] && window.HEAD_SRC && window.HEAD_SRC[id]) { spriteImgs[id] = new Image(); spriteImgs[id].onload = () => { if (inMenu()) renderChars(); }; spriteImgs[id].src = window.HEAD_SRC[id]; }
     return spriteImgs[id];
   }
   function bodyHuman(c, b) {
@@ -1610,34 +1653,76 @@
   }
   const padEl = document.getElementById("pad"), pauseEl = document.getElementById("pausebtn");
   if (touch) overlay.insertBefore(document.querySelector(".opts"), document.getElementById("ov-btn"));   // header is hidden in touch mode: difficulty / sound / 重選角色 live in the menu (and the pause screen)
-  const charsEl = document.getElementById("chars"), oppsEl = document.getElementById("opps"), courtsEl = document.getElementById("courts"), setsEl = document.getElementById("sets"), cstat = document.getElementById("cstat");
+  const selectEl = document.getElementById("select"), gridEl = document.getElementById("grid"), radarEl = document.getElementById("radar");
+  const courtsEl = document.getElementById("courts"), setsEl = document.getElementById("sets"), cstat = document.getElementById("cstat");
   const OPP_IDS = [...Object.keys(CHARS), "random"];
-  function row(el, label, ids, cur, onPick) {
+  let pickWho = "me";                                                     // which side the portrait grid is choosing for
+  for (const bt of document.querySelectorAll(".who button")) bt.addEventListener("click", () => { pickWho = bt.dataset.who; renderChars(); });
+  // radar axes: label + CHARS field (or derived value); each axis is scaled between the roster's min and max, so new characters fit by themselves
+  const STATS = [["速度", "speed"], ["跳躍", "jump"], ["範圍", "reach"], ["力量", "power"], ["集氣", "meter"], ["耐力", (c) => 1 / c.stDrain]];
+  const statOf = (c, f) => (typeof f === "function" ? f(c) : c[f]);
+  function statNorm(id) {
+    const all = Object.values(CHARS);
+    return STATS.map(([, f]) => { const v = all.map((c) => statOf(c, f)), lo = Math.min(...v), hi = Math.max(...v); return 0.16 + 0.84 * (statOf(CHARS[id], f) - lo) / (hi - lo || 1); });
+  }
+  // menu portrait: the in-game drawing of a character (random = "?") on a small canvas
+  function portrait(cv, id) {
+    const g = cv.getContext("2d"), c = CHARS[id], main = ctx, b = makeBody(0);
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height);
+    if (!c) { g.fillStyle = "#f3f1ea"; g.font = `400 ${cv.height * 0.55}px "Bungee", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("?", cv.width / 2, cv.height / 2); return; }
+    const k = cv.height / 232; ctx = g;
+    try {
+      g.translate(cv.width / 2 - 8 * k, cv.height - 5 * k); g.scale(k, k);
+      const shade = c.draw(c, b);
+      if (shade) { g.strokeStyle = shade; g.lineWidth = 7; g.lineCap = "round"; g.beginPath(); g.moveTo(30, -94); g.lineTo(44, -84); g.stroke(); drawRacket(b, c.band, shade); }
+    } finally { ctx = main; }
+  }
+  function drawRadar() {
+    const g = radarEl.getContext("2d"), w = radarEl.width, h = radarEl.height, cx = w / 2, cy = h / 2 + 4, R = h * 0.33, n = STATS.length;
+    const pt = (i, r) => [cx + Math.sin(i / n * Math.PI * 2) * r, cy - Math.cos(i / n * Math.PI * 2) * r];
+    const shape = (vals) => { g.beginPath(); vals.forEach((v, i) => { const [x, y] = pt(i, R * v); if (i) g.lineTo(x, y); else g.moveTo(x, y); }); g.closePath(); };
+    g.clearRect(0, 0, w, h); g.lineWidth = 2; g.strokeStyle = "rgba(255,255,255,.16)";
+    for (const f of [0.25, 0.5, 0.75, 1]) { shape(STATS.map(() => f)); g.stroke(); }
+    for (let i = 0; i < n; i++) { const [x, y] = pt(i, R); g.beginPath(); g.moveTo(cx, cy); g.lineTo(x, y); g.stroke(); }
+    const plot = (id, fill, line) => { shape(statNorm(id)); g.fillStyle = fill; g.fill(); g.lineWidth = 5; g.lineJoin = "round"; g.strokeStyle = line; g.stroke(); };
+    if (oppPick !== "random") plot(oppId, "rgba(111,211,255,.22)", "#6fd3ff");
+    plot(charId, "rgba(255,179,71,.34)", "#ffb347");
+    g.font = '700 30px "Noto Sans TC", sans-serif'; g.fillStyle = "#f3f1ea"; g.textAlign = "center"; g.textBaseline = "middle";
+    STATS.forEach(([lab], i) => { const [x, y] = pt(i, R + 34); g.fillText(lab, x, y); });
+  }
+  function optRow(el, label, items, isOn, onPick) {
     el.innerHTML = `<span class="lab">${label}</span>`;
-    for (const id of ids) {
-      const bt = document.createElement("button"); bt.type = "button"; bt.textContent = id === "random" ? "隨機" : CHARS[id].name;
-      bt.setAttribute("aria-pressed", id === cur); bt.addEventListener("click", () => onPick(id)); el.appendChild(bt);
+    for (const [id, text] of items) {
+      const bt = document.createElement("button"); bt.type = "button"; bt.textContent = text; bt.setAttribute("aria-pressed", isOn(id));
+      bt.addEventListener("click", () => { if (inMenu()) onPick(id); }); el.appendChild(bt);
     }
   }
   function renderChars() {
-    row(charsEl, "自己", Object.keys(CHARS), charId, setChar);
-    row(oppsEl, "對手", OPP_IDS, oppPick, setOpp);
-    const ce = courtsEl; ce.innerHTML = `<span class="lab">場地</span>`;
-    for (const id of Object.keys(COURTS)) {
-      const bt = document.createElement("button"); bt.type = "button"; bt.textContent = COURTS[id].name; bt.setAttribute("aria-pressed", id === courtId);
-      bt.addEventListener("click", () => { if (!inMenu()) return; courtId = id; try { localStorage.setItem("roo-seal-court", id); } catch (e) {} renderChars(); }); ce.appendChild(bt);
+    for (const bt of document.querySelectorAll(".who button")) bt.setAttribute("aria-pressed", bt.dataset.who === pickWho);
+    gridEl.innerHTML = "";
+    for (const id of pickWho === "me" ? Object.keys(CHARS) : OPP_IDS) {
+      const bt = document.createElement("button"); bt.type = "button"; bt.className = "tile";
+      bt.setAttribute("aria-pressed", id === (pickWho === "me" ? charId : oppPick));
+      const cv = document.createElement("canvas"); cv.width = cv.height = 116; bt.appendChild(cv);
+      bt.insertAdjacentHTML("beforeend", `<span>${id === "random" ? "隨機" : CHARS[id].name}</span>${id === charId ? '<i class="tag me">1P</i>' : ""}${id === oppPick ? '<i class="tag cpu">CPU</i>' : ""}`);
+      bt.addEventListener("click", () => (pickWho === "me" ? setChar(id) : setOpp(id)));
+      gridEl.appendChild(bt); portrait(cv, id);
     }
-    setsEl.innerHTML = `<span class="lab">賽制</span>`;
-    for (const n of Object.keys(SETS)) {
-      const bt = document.createElement("button"); bt.type = "button"; bt.textContent = SETS[n]; bt.setAttribute("aria-pressed", +n === gamesToWin);
-      bt.addEventListener("click", () => { if (!inMenu()) return; gamesToWin = +n; try { localStorage.setItem("roo-seal-sets", n); } catch (e) {} renderChars(); }); setsEl.appendChild(bt);
+    const oppShown = oppPick === "random" ? "random" : oppId;
+    for (const [fig, id] of [["vs-me", charId], ["vs-opp", oppShown]]) {
+      const f = document.getElementById(fig); portrait(f.querySelector("canvas"), id);
+      f.querySelector("figcaption").innerHTML = id === "random" ? "<b>隨機</b><small>開賽時抽</small>" : `<b>${CHARS[id].name}</b><small>${CHARS[id].tag}</small>`;
     }
-    const c = me(); cstat.textContent = `${c.tdesc}｜必殺：${c.sp.name.replace("！", "")}｜超必殺：${SUPERS[charId].hint}\n場地・${court().name}：${court().desc}`;
+    drawRadar();
+    optRow(courtsEl, "場地", Object.keys(COURTS).map((id) => [id, COURTS[id].name]), (id) => id === courtId, (id) => { courtId = id; try { localStorage.setItem("roo-seal-court", id); } catch (e) {} renderChars(); });
+    optRow(setsEl, "賽制", Object.keys(SETS).map((n) => [n, SETS[n]]), (n) => +n === gamesToWin, (n) => { gamesToWin = +n; try { localStorage.setItem("roo-seal-sets", n); } catch (e) {} renderChars(); });
+    const c = me();
+    cstat.innerHTML = `<b>特技</b>　${c.tdesc}\n<b>必殺</b>　${c.sp.name.replace("！", "")}　<b>超必殺</b>　${SUPERS[charId].hint}\n<b>場地</b>　${court().name}：${court().desc}`;
   }
   const inMenu = () => phase === "intro" || phase === "over";               // characters only change between matches
   function setChar(id) { if (!inMenu()) return; charId = id; try { localStorage.setItem("roo-seal-char", id); } catch (e) {} renderChars(); }
   function setOpp(id) { if (!inMenu()) return; oppPick = id; if (id !== "random") oppId = id; try { localStorage.setItem("roo-seal-opp", id); } catch (e) {} renderChars(); }
-  function showOverlay(title, text, btn) { ovTitle.textContent = title; ovText.textContent = text; overlay.dataset.mode = "text"; ovBtn.textContent = btn; overlay.hidden = false; charsEl.hidden = oppsEl.hidden = courtsEl.hidden = setsEl.hidden = cstat.hidden = phase === "paused" || phase === "over"; overlay.scrollTop = 0; overShownAt = performance.now(); clipEl.classList.toggle("over", phase === "over"); }   // result screen: clip tucked in the bottom corner
+  function showOverlay(title, text, btn) { ovTitle.textContent = title; ovText.textContent = text; overlay.dataset.mode = "text"; ovBtn.textContent = btn; overlay.hidden = false; selectEl.hidden = phase === "paused" || phase === "over"; overlay.scrollTop = 0; overShownAt = performance.now(); clipEl.classList.toggle("over", phase === "over"); }   // result screen: clip tucked in the bottom corner
   const stopClip = () => { clipEl.pause(); clipEl.classList.remove("on", "over"); };
   function startMatch() {
     stopClip();
@@ -1663,8 +1748,7 @@
   function showMenu() {
     stopClip(); phase = "intro"; ball.live = false; msg = ""; roo.bubble = seal.bubble = ""; placeForServe();
     ovTitle.textContent = "網球大亂鬥"; ovBtn.textContent = "開始比賽"; delete overlay.dataset.mode;
-    charsEl.hidden = oppsEl.hidden = courtsEl.hidden = setsEl.hidden = cstat.hidden = false; overlay.hidden = false; overlay.scrollTop = 0;
-    for (const b of document.querySelectorAll('.chars button[aria-pressed="true"]')) b.scrollIntoView({ block: "nearest", inline: "center" });   // selected pill visible on phones
+    selectEl.hidden = false; overlay.hidden = false; overlay.scrollTop = 0; pickWho = "me"; renderChars();
   }
   document.getElementById("restart").addEventListener("click", (e) => { e.currentTarget.blur(); showMenu(); });
   const sBtn = document.getElementById("sound");
@@ -1705,6 +1789,7 @@
   if (location.hash === "#test") window.__g = { roo, seal, ball, keys, score, awardPoint, startMatch, smashSpot, swing, jump, hitBall, me, opp, predict, serveCourt, get phase() { return phase; }, set phase(v) { phase = v; }, set lastHitter(v) { lastHitter = v; }, get lastHitter() { return lastHitter; }, get bounces() { return bounces; }, get msg() { return msg; }, set msg(v) { msg = v; } };
   if (oppPick !== "random") oppId = oppPick;
   renderChars(); placeForServe();
+  addEventListener("load", () => { if (inMenu()) renderChars(); });       // sprites (HEAD_SRC) are parsed after this script: redraw the portraits
   requestAnimationFrame(frame);
 })();
 </script>
