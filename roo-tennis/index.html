@@ -210,14 +210,14 @@
   // raging hulk's shots and serve (fastest normal ball, rips through the net). Was 46 = unreturnable (computer 1/18): in 一局決勝 the player
   // serves every point and rages after every lost point, so each one was a free ace ("我發球電腦都不接"). 36: computer returns about half
   const RAGE_SPEED = 36;
-  // fox trait "overtime": at stamina < OT_ST every normal shot goes out at OT_SPEED (faster than a rage ball), with an overtime call-out
-  const OT_ST = 0.3, OT_SPEED = 38, OT_MIN_T = 0.3;   // OT_MIN_T: shortest flight (s); the net-clearing arc caps it at ~22–25 m/s (fox normal 10.5). 0.2 like rage skims into the net (rage rips through it)
+  // fox trait "overtime": at stamina < OT_ST (half) every normal shot goes out at OT_SPEED (faster than a rage ball), with an overtime call-out
+  const OT_ST = 0.5, OT_SPEED = 38, OT_MIN_T = 0.3;   // OT_MIN_T: shortest flight (s); the net-clearing arc caps it at ~22–25 m/s (fox normal 10.5). 0.2 like rage skims into the net (rage rips through it)
   const BSOD_T = 2.2;
   // capybara: special "onsen" leaves a hot spring where it first bounces (ONSEN_T s, radius ONSEN_R m); anyone else standing in it moves at ONSEN_SLOW.
   // Super: the whole other half turns into a spring for ONSEN_ALL_T s, the receiver sits in it (frozen) with an orange on its head
   const ONSEN_T = 4, ONSEN_R = 1.7, ONSEN_SLOW = 0.35, ONSEN_ALL_T = 2.4;
   const LINES_CALM = ["……（沒感覺）", "卡皮不在乎", "喔。", "（繼續發呆）"];                    // fox super: seconds the other half of the court shows a blue screen (receiver frozen as long)
-  const OT_LINES = ["今晚又要加班了！", "責任制啦！", "老闆說明天要上線！", "爆肝模式啟動！", "電量 5%，衝了！", "這個 bug 今天一定要修完！"];
+  const OT_LINES = ["我很帥，又會修電腦！", "今晚又要加班了！", "責任制啦！", "學妹的電腦今天一定要修完！", "爆肝模式啟動！", "修完電腦還要打球，我好忙"];
   const AI_WALK = 0.5, AI_HOME_DEAD = 0.6;   // computer between shots: walks (half speed, half drain) back to the baseline centre, ignores < 0.6 m
   const TOSS_V = 6, APEX_OK = 0.08;     // serve toss speed; perfect-serve window (s) around the toss apex
   const K = 78, Y0 = -3.2, YSPAN = L + 6.4, SCR_NEAR = 562, SCR_FAR = 152, FAR_SHRINK = 0.45;
@@ -274,9 +274,9 @@
     zap:     { name: "電電鼠", speed: 7.0, jump: 5.4, reach: 1.3, dive: 3.0, power: 0.95, meter: 1.7, band: "#e8483b", tag: "快、集氣快、手短",
                sp: { name: "砸瓦魯多！時間停止！", speed: 30, rgb: "255,240,90", fx: "zigzag", hurt: "（時間停止中）", timestop: 2.2 }, trait: "static", tdesc: "靜電：完美擊球把對手電麻 0.9 秒", stDrain: 1.0,
                draw: (c) => bodyZap(c) },
-    fox:     { name: "毛毛lung", speed: 6.3, jump: 5.0, reach: 4.0, dive: 3.0, power: 0.5, meter: 1.4, band: "#ff8a2a", tag: "筆電當球拍：範圍超大、力氣超小",
+    fox:     { name: "毛毛lung", speed: 6.3, jump: 5.0, reach: 1.7, dive: 3.0, power: 0.5, meter: 1.4, band: "#ff8a2a", tag: "只幫妹子修電腦的工程師：筆電當球拍、力氣超小",
                sp: { name: "404 Not Found 球！", speed: 30, rgb: "120,200,255", fx: "404", hurt: "球…球呢？！" },
-               trait: "overtime", tdesc: "加班模式：電量（體力）剩三成以下，每球球速暴增；但本來就很耗電", stDrain: 1.4,
+               trait: "overtime", tdesc: "加班模式：電量（體力）剩一半以下，每球球速暴增；但本來就很耗電", stDrain: 1.4,
                look: { sprite: "fox", skin: "#ff8a2a" }, draw: (c, b) => bodyHuman(c, b) },
     capy:    { name: "卡皮", speed: 4.8, jump: 3.8, reach: 1.8, dive: 2.5, power: 1.0, meter: 1.0, band: "#b5773a", tag: "超佛系：慢、不會累、什麼都不在乎",
                sp: { name: "溫泉球！", speed: 24, rgb: "140,220,230", fx: "onsen", hurt: "好…好舒服…" },
@@ -294,7 +294,7 @@
     hulk: [["吼——！", "綠巨人最強！"], ["我、我要變身了…", "不要惹我生氣"]],
     cap: [["不要大意地上吧", "帽子戴好，球就好", "公仔也會贏"], ["帽子歪了啦", "我只是個公仔…"]],
     zap: [["電電電！", "這就是我的替身", "無駄無駄無駄！"], ["電…電…", "沒電了"]],
-    fox: [["一次就 build 過", "先 commit 再說", "這就是 clean code"], ["在我電腦上可以跑啊", "這 bug 不是我寫的", "我開個會馬上回來"]],
+    fox: [["我很帥，又會修電腦", "學妹，電腦修好了喔", "一次就 build 過"], ["在我電腦上可以跑啊", "等等，學妹電腦藍屏了我先去", "只有妹子的電腦我才修"]],
     capy: [["佛系勝利", "泡湯去囉", "一切隨緣"], ["沒差啦", "橘子還在就好", "……（繼續泡）"]],
   };
   // super special: meter full AND the character's own trigger on that hit → faster ball that blows the receiver off the court
