@@ -8,8 +8,8 @@
 <link rel="preload" as="image" href="./assets/heads-capy0.webp">
 <link rel="preload" as="image" href="./assets/heads-capy1.webp">
 
-<script type="module" crossorigin src="./assets/index-DPZEg3Nm.js"></script>
-<link rel="stylesheet" crossorigin href="./assets/index-HwCtxLio.css">
+<script type="module" crossorigin src="./assets/index-DzOFe_s0.js"></script>
+<link rel="stylesheet" crossorigin href="./assets/index-Dn0jzhqk.css">
 
 <meta charset="utf-8" />
 <meta
@@ -67,80 +67,86 @@
     <button type="button" id="skip" hidden>跳過 ▶▶</button>
     <button type="button" id="pausebtn" aria-label="暫停／選單">❚❚</button>
     <div class="overlay" id="overlay">
-      <h2 id="ov-title">網球大亂鬥</h2>
-      <p id="ov-text"></p>
-      <div class="select" id="select">
-        <div class="pickcol">
-          <div class="who" role="group" aria-label="要選誰">
-            <button type="button" data-who="me" aria-pressed="true">
-              選自己</button
-            ><button type="button" data-who="opp" aria-pressed="false">
-              選對手
-            </button>
+      <div class="menu-content" id="menu-content">
+        <h2 id="ov-title">網球大亂鬥</h2>
+        <p id="ov-text"></p>
+        <div class="select" id="select">
+          <div class="pickcol">
+            <div class="who" role="group" aria-label="要選誰">
+              <button type="button" data-who="me" aria-pressed="true">
+                選自己</button
+              ><button type="button" data-who="opp" aria-pressed="false">
+                選對手
+              </button>
+            </div>
+            <div class="grid" id="grid" role="group" aria-label="角色"></div>
+            <div class="chars" id="sets" role="group" aria-label="選賽制"></div>
           </div>
-          <div class="grid" id="grid" role="group" aria-label="角色"></div>
-          <div class="chars" id="sets" role="group" aria-label="選賽制"></div>
-        </div>
-        <div class="card">
-          <div class="vs">
-            <figure id="vs-me">
-              <canvas width="168" height="168"></canvas>
-              <figcaption></figcaption>
-            </figure>
-            <span class="vstag">VS</span>
-            <figure id="vs-opp">
-              <canvas width="168" height="168"></canvas>
-              <figcaption></figcaption>
-            </figure>
+          <div class="card">
+            <div class="vs">
+              <figure id="vs-me">
+                <canvas width="168" height="168"></canvas>
+                <figcaption></figcaption>
+              </figure>
+              <span class="vstag">VS</span>
+              <figure id="vs-opp">
+                <canvas width="168" height="168"></canvas>
+                <figcaption></figcaption>
+              </figure>
+            </div>
+            <canvas
+              id="radar"
+              width="560"
+              height="440"
+              role="img"
+              aria-label="能力比較圖"
+            ></canvas>
+            <div class="cstat" id="cstat"></div>
           </div>
-          <canvas
-            id="radar"
-            width="560"
-            height="440"
-            role="img"
-            aria-label="能力比較圖"
-          ></canvas>
-          <div class="cstat" id="cstat"></div>
         </div>
+        <div class="rotate touchonly">↻ 手機橫放更好玩</div>
+        <div class="quick">
+          <span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打</span
+          ><span class="touch">左邊移動，右邊「打」</span>
+        </div>
+        <button type="button" class="linkbtn" id="replay">
+          ▶ 重看開場動畫
+        </button>
+        <details class="rules">
+          <summary>完整玩法</summary>
+          <ul>
+            <li>
+              跑到地上的<b>黃圈</b>按「打」。提早按＝<b>蓄力</b>（會多耗體力）。
+            </li>
+            <li>
+              擊球時按住
+              <b>←→</b> 控制方向；高吊球、小球會隨機出現；邊跑邊打球會拐彎。
+            </li>
+            <li>
+              高球會出現紅色<b>扣殺點</b>：附近按「打」會自動飛撲<b>扣殺</b>（按鈕變「扣殺!」）；按鈕發亮、出現「扣殺！」時按＝<b>完美扣殺</b>。
+            </li>
+            <li>
+              <b>發球</b
+              >：按一次拋球、最高點再按＝完美發球（上旋、切球隨機出現）。左右區每分輪流。
+            </li>
+            <li>
+              集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。
+            </li>
+            <li>
+              連續 3
+              次<b>完美擊球</b>＝<b>無我境界</b>：完美區變大、集氣加倍，丟分才解除。
+            </li>
+            <li>
+              對拍越長球越快；贏下 10 拍以上的長對拍＝<b>必殺直接集滿</b>。
+            </li>
+            <li>
+              對方必殺飛來時<b>提早按「打」蓄力</b>或打出<b>完美擊球</b>＝<b>退貨</b>，原路打回去（可以一直互懟，越來越快）。
+            </li>
+            <li><b>體力</b>越少跑越慢，站著會回。P 暫停。</li>
+          </ul>
+        </details>
       </div>
       <button type="button" class="play" id="ov-btn">開始比賽</button>
-      <div class="rotate touchonly">↻ 手機橫放更好玩</div>
-      <div class="quick">
-        <span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打</span
-        ><span class="touch">左邊移動，右邊「打」</span>
-      </div>
-      <button type="button" class="linkbtn" id="replay">▶ 重看開場動畫</button>
-      <details class="rules">
-        <summary>完整玩法</summary>
-        <ul>
-          <li>
-            跑到地上的<b>黃圈</b>按「打」。提早按＝<b>蓄力</b>（會多耗體力）。
-          </li>
-          <li>
-            擊球時按住
-            <b>←→</b> 控制方向；高吊球、小球會隨機出現；邊跑邊打球會拐彎。
-          </li>
-          <li>
-            高球會出現紅色<b>扣殺點</b>：附近按「打」會自動飛撲<b>扣殺</b>（按鈕變「扣殺!」）；按鈕發亮、出現「扣殺！」時按＝<b>完美扣殺</b>。
-          </li>
-          <li>
-            <b>發球</b
-            >：按一次拋球、最高點再按＝完美發球（上旋、切球隨機出現）。左右區每分輪流。
-          </li>
-          <li>
-            集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。
-          </li>
-          <li>
-            連續 3
-            次<b>完美擊球</b>＝<b>無我境界</b>：完美區變大、集氣加倍，丟分才解除。
-          </li>
-          <li>對拍越長球越快；贏下 10 拍以上的長對拍＝<b>必殺直接集滿</b>。</li>
-          <li>
-            對方必殺飛來時<b>提早按「打」蓄力</b>或打出<b>完美擊球</b>＝<b>退貨</b>，原路打回去（可以一直互懟，越來越快）。
-          </li>
-          <li><b>體力</b>越少跑越慢，站著會回。P 暫停。</li>
-        </ul>
-      </details>
     </div>
   </div>
 
