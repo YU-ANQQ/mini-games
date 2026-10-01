@@ -1,5 +1,5 @@
 # mini-games
 
-單檔 HTML 小遊戲，瀏覽器直接開就能玩。
+網頁小遊戲，瀏覽器開啟線上網址即可玩。
 
 - [網球大亂鬥](https://yu-anqq.github.io/mini-games/roo-tennis/)
