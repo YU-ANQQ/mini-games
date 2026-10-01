@@ -8,8 +8,8 @@
 <link rel="preload" as="image" href="./assets/heads-capy0.webp">
 <link rel="preload" as="image" href="./assets/heads-capy1.webp">
 
-<script type="module" crossorigin src="./assets/index-DzOFe_s0.js"></script>
-<link rel="stylesheet" crossorigin href="./assets/index-Dn0jzhqk.css">
+<script type="module" crossorigin src="./assets/index-DAZ0z9h8.js"></script>
+<link rel="stylesheet" crossorigin href="./assets/index-BtdYUAwQ.css">
 
 <meta charset="utf-8" />
 <meta
@@ -56,14 +56,6 @@
 
   <div class="stage" id="stage">
     <div id="game"></div>
-    <video id="clip" muted playsinline aria-hidden="true"></video>
-    <video
-      id="intro"
-      muted
-      playsinline
-      aria-label="開場動畫（點一下跳過）"
-      hidden
-    ></video>
     <button type="button" id="skip" hidden>跳過 ▶▶</button>
     <button type="button" id="pausebtn" aria-label="暫停／選單">❚❚</button>
     <div class="overlay" id="overlay">
@@ -101,6 +93,7 @@
               role="img"
               aria-label="能力比較圖"
             ></canvas>
+            <div class="character-tags" id="character-tags"></div>
             <div class="cstat" id="cstat"></div>
           </div>
         </div>
@@ -109,9 +102,6 @@
           <span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打</span
           ><span class="touch">左邊移動，右邊「打」</span>
         </div>
-        <button type="button" class="linkbtn" id="replay">
-          ▶ 重看開場動畫
-        </button>
         <details class="rules">
           <summary>完整玩法</summary>
           <ul>
@@ -146,7 +136,12 @@
           </ul>
         </details>
       </div>
-      <button type="button" class="play" id="ov-btn">開始比賽</button>
+      <div class="menu-actions" id="menu-actions">
+        <button type="button" class="linkbtn" id="replay">
+          ▶ 重看開場動畫
+        </button>
+        <button type="button" class="play" id="ov-btn">開始比賽</button>
+      </div>
     </div>
   </div>
 
