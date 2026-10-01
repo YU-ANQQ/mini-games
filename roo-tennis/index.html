@@ -8,8 +8,8 @@
 <link rel="preload" as="image" href="./assets/heads-capy0.webp">
 <link rel="preload" as="image" href="./assets/heads-capy1.webp">
 
-<script type="module" crossorigin src="./assets/index-ht8R8EdM.js"></script>
-<link rel="stylesheet" crossorigin href="./assets/index-C-VJqx3c.css">
+<script type="module" crossorigin src="./assets/index-CqhAebBb.js"></script>
+<link rel="stylesheet" crossorigin href="./assets/index-DtR1g2pg.css">
 
 <meta charset="utf-8" />
 <meta
@@ -129,6 +129,20 @@
     </div>
   </div>
 
+  <div id="serve-controls" hidden aria-label="發球瞄準與球種">
+    <div id="serve-spin" role="group" aria-label="發球球種">
+      <button type="button" data-spin="flat" aria-pressed="true">
+        平擊 <small>1</small>
+      </button>
+      <button type="button" data-spin="top" aria-pressed="false">
+        上旋 <small>2</small>
+      </button>
+    </div>
+    <button type="button" id="serve-aim-pad">拖曳瞄準・放開拋球</button>
+    <button type="button" id="lob-hit" hidden>挑高 <small>X / K</small></button>
+    <span id="serve-timing" role="status" aria-live="off"></span>
+  </div>
+
   <div class="pad" id="pad" aria-label="觸控操作">
     <div id="stick" aria-label="移動（按住拖曳）">
       <div class="base" hidden></div>
@@ -141,8 +155,11 @@
   </div>
 
   <div class="help keys">
-    <kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打（擊球時 ←→
-    方向；扣殺點附近按＝自動飛撲扣殺）　<kbd>P</kbd> 暫停
+    <kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打（擊球時 ←→ 方向；<kbd>X／K</kbd>
+    挑高；扣殺點附近按＝自動飛撲扣殺）　<kbd>P</kbd> 暫停<br />發球：<kbd
+      >Shift＋方向鍵</kbd
+    >
+    瞄準　<kbd>1</kbd> 平擊／<kbd>2</kbd> 上旋；也可拖曳右側瞄準鍵
   </div>
 </div>
 
@@ -151,17 +168,26 @@
 <dialog id="rules-dialog" class="rules-dialog" aria-labelledby="rules-title">
   <h2 id="rules-title" tabindex="-1" autofocus>完整玩法</h2>
   <ul>
-    <li>跑到地上的<b>黃圈</b>按「打」。提早按＝<b>蓄力</b>（會多耗體力）。</li>
+    <li>
+      跑到地上的<b>黃圈</b>按「打」。提早按＝<b>蓄力</b>（會多耗體力），「MAX」表示滿蓄，球進入範圍會自動打出。
+    </li>
     <li>
       擊球時按住
-      <b>←→</b> 控制方向；高吊球、小球會隨機出現；邊跑邊打球會拐彎。
+      <b>←→</b> 控制方向；「打」是平擊，「挑高」（鍵盤
+      X／K）是高吊球。提早按可蓄力等待；邊跑邊打球會拐彎。
     </li>
     <li>
       高球會出現紅色<b>扣殺點</b>：附近按「打」會自動飛撲<b>扣殺</b>（按鈕變「扣殺!」）；按鈕發亮、出現「扣殺！」時按＝<b>完美扣殺</b>。
     </li>
     <li>
       <b>發球</b
-      >：先在指定半側底線後左右選位，按一次拋球後站位鎖定，最高點再按＝完美發球。左右區每分輪流。第一落地須在對角發球區，壓線算內；落對區不直接得分。
+      >：先在指定半側底線後左右選位。右側「打」鍵左右拖曳選方向、上下拖曳選深度，放開拋球，再點一次抓最高點出拍；不拖曳時沿用預設目標。桌面可拖右側瞄準鍵，或
+      Shift＋方向鍵選點、空白鍵拋球／出拍。拋球後站位與目標鎖定。左右區每分輪流。第一落地須在對角發球區，壓線算內；落對區不直接得分。
+    </li>
+    <li>
+      <b>落點與時機</b
+      >：十字是目標、外圈是失準範圍；拋球前是預覽，拋球中隨時機變化。太早／太晚圈較大，完美＝零散布。紅色目標在合法區外，完美也會失誤。可選平擊（快）／上旋（高弧線、高彈跳），鍵盤
+      1／2 切換；二發與 let 保留選擇。拖曳不蓄力、沒有力量條。
     </li>
     <li>
       <b>兩次機會</b
@@ -180,9 +206,10 @@
     </li>
     <li>對拍越長球越快；贏下 10 拍以上的長對拍＝<b>必殺直接集滿</b>。</li>
     <li>
-      對方必殺飛來時<b>提早按「打」蓄力</b>或打出<b>完美擊球</b>＝<b>退貨</b>，原路打回去（可以一直互懟，越來越快）。
+      對方必殺飛來時<b>提前蓄到 MAX</b
+      >或打出<b>完美擊球</b>＝<b>退貨</b>，原路打回去（可以一直互懟，越來越快）。
     </li>
-    <li><b>體力</b>越少跑越慢，站著會回。P 暫停。</li>
+    <li><b>體力</b>越少跑越慢，耗盡仍可移動；停下恢復。P 暫停。</li>
   </ul>
   <form method="dialog"><button class="btn">關閉</button></form>
 </dialog>
