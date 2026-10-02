@@ -8,7 +8,7 @@
 <link rel="preload" as="image" href="./assets/heads-capy0.webp">
 <link rel="preload" as="image" href="./assets/heads-capy1.webp">
 
-<script type="module" crossorigin src="./assets/index-DPGEJp2J.js"></script>
+<script type="module" crossorigin src="./assets/index-rVVLin_M.js"></script>
 <link rel="stylesheet" crossorigin href="./assets/index-DVmDs9_g.css">
 
 <meta charset="utf-8" />
@@ -100,7 +100,7 @@
         <div class="rotate touchonly">↻ 手機橫放更好玩</div>
         <div class="quick">
           <span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打</span
-          ><span class="touch">左半移動，右半拖放擊球</span>
+          ><span class="touch">左半移動，右半點一下擊球</span>
         </div>
       </div>
       <div class="menu-actions" id="menu-actions">
@@ -138,7 +138,7 @@
     </div>
     <span class="stick-hint left">左半：拖曳移動</span>
     <span class="stick-hint right" id="right-stick-hint"
-      >右半：拖放平擊・點後拖上旋</span
+      >右半：點一下擊球・拖曳選方向</span
     >
     <div class="acts"><button type="button" class="hit">打</button></div>
   </div>
@@ -146,10 +146,8 @@
 
   <div class="help keys">
     <kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 擊球　<kbd>Shift＋←→</kbd>
-    選方向　<kbd>1／2</kbd> 平擊／上旋　<kbd>X／K</kbd> 挑高　<kbd>P</kbd>
-    暫停<br />
-    發球站定後自動拋球；也可用空白鍵手動拋球。觸控：左半拖曳移動，右半拖放平擊；先點一下再拖／點，250ms
-    內的第二下是上旋，超時回平擊。
+    選方向　<kbd>X／K</kbd> 挑高　<kbd>P</kbd> 暫停<br />
+    發球：空白鍵先拋球、再按擊球。觸控：左半拖曳移動，右半點一下擊球；水平拖曳可選方向。第一次點只拋球，再點才發球。
   </div>
 </div>
 
@@ -159,28 +157,22 @@
   <h2 id="rules-title" tabindex="-1" autofocus>完整玩法</h2>
   <ul>
     <li>
-      移動到地上的<b>黃圈</b>附近，右半拖曳放開擊球。提早出拍＝<b>蓄力</b>（會多耗體力），「MAX」表示滿蓄，球進入範圍會自動打出。
+      移動到地上的<b>黃圈</b>附近，右半點一下擊球，也可拖曳選方向後放開。提早出拍＝<b>蓄力</b>（會多耗體力），「MAX」表示滿蓄，球進入範圍會自動打出。
     </li>
     <li>
       <b>鍵盤</b>：擊球時按住 ←→ 控制方向，空白鍵平擊，X／K 挑高；Shift＋←→
-      可預選方向，1／2
-      選平擊／上旋。手機用右半水平拖曳選方向，直接拖放平擊，快點後再點／拖放上旋。
-      垂直拖放沿用目前左右方向。得分演出時點右半可略過等待。
+      可預選方向。手機右半點一下平擊，水平拖曳可選方向；不拖時朝安全中性方向打。得分演出時點右半可略過等待。
     </li>
     <li>
       高球會出現紅色<b>扣殺點</b>：附近出拍會自動飛撲<b>扣殺</b>；抓準扣殺時機可打出<b>完美扣殺</b>。
     </li>
     <li>
-      <b>發球</b>：左半任意位置拖曳選站位，放開並站定約 0.5
-      秒自動拋球；沒擊球就免費重拋。右半直接左右拖放平擊；先點一下，再於兩次按下間隔
-      250ms
-      內點／拖，第二下放開打上旋。第二下超時就是平擊，按住多久不改球種或力量。純第一下點按只準備連點，不出拍。深度固定，只有左右方向可調；放開時機決定準度。
+      <b>發球</b
+      >：左半拖曳選站位，右半第一次點按放開只拋球；拖曳放開也只拋球。再點一次擊球，或水平拖曳選左右方向後放開擊球。沒擊球落下不算失誤，等你再點才重拋。放開時機決定準度，深度固定。
     </li>
     <li>
       <b>落點與時機</b
-      >：十字是目標、外圈是失準範圍；拋球前是預覽，拋球中隨時機變化。太早／太晚圈較大，完美＝零散布。紅色目標在合法區外，完美也會失誤。可選平擊（快）／上旋（高弧線、高彈跳），鍵盤
-      1／2 切換；二發與 let
-      保留選擇。一般回擊也用同樣拖放／連點與左右方向。按住本身不蓄力；提早出拍後等待來球的既有蓄力照常。
+      >：十字是目標、外圈是失準範圍；太早／太晚圈較大，完美＝零散布。紅色目標表示區外，完美擊球也會失誤。玩家點按都是平擊，快速連點不切換球種。一般回擊也可直接點一下，或拖曳選左右方向。按住本身不蓄力；提早出拍後等待來球的既有蓄力照常。
     </li>
     <li>
       <b>兩次機會</b
@@ -190,7 +182,7 @@
     </li>
     <li>
       <b>接發球</b
-      >必須先落地才能回擊；可提早按「打」等待。發球合法落地前不觸發必殺、穿網或救球豁免，已集滿的能量保留。
+      >必須先落地才能回擊；可提早出拍等待。發球合法落地前不觸發必殺、穿網或救球豁免，已集滿的能量保留。
     </li>
     <li>集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。</li>
     <li>
