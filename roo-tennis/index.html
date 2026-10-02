@@ -8,8 +8,8 @@
 <link rel="preload" as="image" href="./assets/heads-capy0.webp">
 <link rel="preload" as="image" href="./assets/heads-capy1.webp">
 
-<script type="module" crossorigin src="./assets/index-8IeT1lP1.js"></script>
-<link rel="stylesheet" crossorigin href="./assets/index-DVmDs9_g.css">
+<script type="module" crossorigin src="./assets/index-Byw6pi7Y.js"></script>
+<link rel="stylesheet" crossorigin href="./assets/index-C-VJqx3c.css">
 
 <meta charset="utf-8" />
 <meta
@@ -100,7 +100,7 @@
         <div class="rotate touchonly">↻ 手機橫放更好玩</div>
         <div class="quick">
           <span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打</span
-          ><span class="touch">左半移動，右半點一下擊球</span>
+          ><span class="touch">左邊移動，右邊「打」</span>
         </div>
       </div>
       <div class="menu-actions" id="menu-actions">
@@ -129,25 +129,20 @@
     </div>
   </div>
 
-  <div class="pad" id="pad" hidden aria-label="左右半邊觸控操作">
-    <div class="floating-stick" id="move-stick" hidden aria-hidden="true">
-      <span class="stick-knob"></span>
+  <div class="pad" id="pad" aria-label="觸控操作">
+    <div id="stick" aria-label="移動（按住拖曳）">
+      <div class="base" hidden></div>
+      <div class="knob" hidden></div>
+      <span class="hint">按住這半邊拖曳＝移動</span>
     </div>
-    <div class="floating-stick" id="hit-stick" hidden aria-hidden="true">
-      <span class="stick-knob">↔</span><span class="stick-label">打</span>
+    <div class="acts">
+      <button type="button" class="hit" data-k="hit">打</button>
     </div>
-    <span class="stick-hint left">左半：拖曳移動</span>
-    <span class="stick-hint right" id="right-stick-hint"
-      >右半：點一下擊球・拖曳選方向</span
-    >
-    <div class="acts"><button type="button" class="hit">打</button></div>
   </div>
-  <span id="serve-timing" role="status" aria-live="off" hidden></span>
 
   <div class="help keys">
-    <kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 擊球　<kbd>Shift＋←→</kbd>
-    選方向　<kbd>X／K</kbd> 挑高　<kbd>P</kbd> 暫停<br />
-    發球：空白鍵先拋球、再按擊球。觸控：左半拖曳移動，右半點一下擊球；水平拖曳可選方向。第一次點只拋球，再點才發球。
+    <kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打（擊球時 ←→
+    方向；扣殺點附近按＝自動飛撲扣殺）　<kbd>P</kbd> 暫停
   </div>
 </div>
 
@@ -156,34 +151,17 @@
 <dialog id="rules-dialog" class="rules-dialog" aria-labelledby="rules-title">
   <h2 id="rules-title" tabindex="-1" autofocus>完整玩法</h2>
   <ul>
+    <li>跑到地上的<b>黃圈</b>按「打」。提早按＝<b>蓄力</b>（會多耗體力）。</li>
     <li>
-      移動到地上的<b>黃圈</b>附近，右半點一下擊球，也可拖曳選方向後放開。接球時停下會自動<b>集氣</b>，同時恢復體力，0.45
-      秒到「MAX」；移動就清空。仍須點一下出拍，可提前點好等球進入範圍。
+      擊球時按住
+      <b>←→</b> 控制方向；高吊球、小球會隨機出現；邊跑邊打球會拐彎。
     </li>
     <li>
-      <b>鍵盤</b>：擊球時按住 ←→ 控制方向，空白鍵平擊，X／K 挑高；Shift＋←→
-      可預選方向。手機右半點一下平擊，水平拖曳可選方向；不拖時朝安全中性方向打。得分演出時點右半可略過等待。
-    </li>
-    <li>
-      高球會出現紅色<b>扣殺點</b>：附近出拍會自動飛撲<b>扣殺</b>；抓準扣殺時機可打出<b>完美扣殺</b>。
+      高球會出現紅色<b>扣殺點</b>：附近按「打」會自動飛撲<b>扣殺</b>（按鈕變「扣殺!」）；按鈕發亮、出現「扣殺！」時按＝<b>完美扣殺</b>。
     </li>
     <li>
       <b>發球</b
-      >：左半拖曳選站位，右半第一次點按放開只拋球；拖曳放開也只拋球。再點一次擊球，或水平拖曳選左右方向後放開擊球。沒擊球落下不算失誤，等你再點才重拋。放開時機決定準度，深度固定。
-    </li>
-    <li>
-      <b>落點與時機</b
-      >：十字是目標、外圈是失準範圍；太早／太晚圈較大，完美＝零散布。紅色目標表示區外，完美擊球也會失誤。玩家點按都是平擊，快速連點不切換球種。一般回擊也可直接點一下，或拖曳選左右方向。集氣只看是否停止移動，與按住或拖曳右手無關；出拍不會清掉已累積的集氣。
-    </li>
-    <li>
-      <b>兩次機會</b
-      >：一發失誤改第二發，雙誤對手得分；錯區、出界、未過網或揮空都算失誤。觸網後仍落對區＝<b
-        >let 重發</b
-      >，保留同一發、同一側。未揮拍的重拋不扣機會。
-    </li>
-    <li>
-      <b>接發球</b
-      >必須先落地才能回擊及站定集氣；可提早出拍等待。發球合法落地前不觸發必殺、穿網或救球豁免，已集滿的能量保留。
+      >：按一次拋球、最高點再按＝完美發球（上旋、切球隨機出現）。左右區每分輪流。
     </li>
     <li>集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。</li>
     <li>
@@ -192,10 +170,9 @@
     </li>
     <li>對拍越長球越快；贏下 10 拍以上的長對拍＝<b>必殺直接集滿</b>。</li>
     <li>
-      對方必殺飛來時<b>提前蓄到 MAX</b
-      >或打出<b>完美擊球</b>＝<b>退貨</b>，原路打回去（可以一直互懟，越來越快）。
+      對方必殺飛來時<b>提早按「打」蓄力</b>或打出<b>完美擊球</b>＝<b>退貨</b>，原路打回去（可以一直互懟，越來越快）。
     </li>
-    <li><b>體力</b>越少跑越慢，耗盡仍可移動；停下恢復。P 暫停。</li>
+    <li><b>體力</b>越少跑越慢，站著會回。P 暫停。</li>
   </ul>
   <form method="dialog"><button class="btn">關閉</button></form>
 </dialog>
