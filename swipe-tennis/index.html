@@ -8,8 +8,8 @@
 <link rel="preload" as="image" href="./assets/heads-capy0.webp">
 <link rel="preload" as="image" href="./assets/heads-capy1.webp">
 
-<script type="module" crossorigin src="./assets/index-B9sRcQeo.js"></script>
-<link rel="stylesheet" crossorigin href="./assets/index-BK2v2Io9.css">
+<script type="module" crossorigin src="./assets/index-lA5MeRfb.js"></script>
+<link rel="stylesheet" crossorigin href="./assets/index-CR6u05bB.css">
 
 <meta charset="utf-8" />
 <meta
@@ -87,13 +87,7 @@
                 <figcaption></figcaption>
               </figure>
             </div>
-            <canvas
-              id="radar"
-              width="560"
-              height="440"
-              role="img"
-              aria-label="能力比較圖"
-            ></canvas>
+            <div class="attr-cards" id="attr-cards"></div>
             <div class="character-tags" id="character-tags"></div>
             <div class="cstat" id="cstat"></div>
           </div>
@@ -144,10 +138,12 @@
     <li>
       揮拍有<b>誤差</b>：落點範圍是一個沿著球路拉長的<b>橢圓</b>，球落在橢圓內；平快球可能<b>掛網</b>、深的快球可能出界（橢圓下方會寫「掛網
       x%／出界
-      x%」）。白＝保證進，橘＝有風險，紅＝瞄的點就出界。滑越快、這拍用的能力越低，橢圓越大；慢慢挑高最安全。滑動畫成弧線＝<b>側旋</b>，球會先往外拐再拐回來。
+      x%」）。白＝保證進，橘＝有風險，紅＝瞄的點就出界。滑越快、準度越低（或這拍有「噴」的詞條），橢圓越大；慢慢挑高最安全。滑動畫成弧線＝<b>側旋</b>，球會先往外拐再拐回來。
     </li>
     <li>
-      每拍只用一項能力：球在身體右邊＝<b>正拍</b>，左邊＝<b>反拍</b>，落地前＝<b>截擊</b>；自動追球會盡量繞到你比較強的那一側。
+      球在身體右邊＝<b>正拍</b>，左邊＝<b>反拍</b>，落地前＝<b>截擊</b>；每隻角色有四條數值（準度、旋轉、敏捷、體力）和最多
+      5 個<b>詞條</b>（白＝強項、紅＝弱點，例如正拍重砲 III、反拍軟
+      II）。自動追球會盡量繞到你比較強的那一側。
     </li>
     <li>
       <b>發球</b
