@@ -8,8 +8,8 @@
 <link rel="preload" as="image" href="./assets/heads-capy0.webp">
 <link rel="preload" as="image" href="./assets/heads-capy1.webp">
 
-<script type="module" crossorigin src="./assets/index-BVkyjVpw.js"></script>
-<link rel="stylesheet" crossorigin href="./assets/index-CR6u05bB.css">
+<script type="module" crossorigin src="./assets/index-Hvwk35gC.js"></script>
+<link rel="stylesheet" crossorigin href="./assets/index-C-VJqx3c.css">
 
 <meta charset="utf-8" />
 <meta
@@ -23,13 +23,13 @@
   name="apple-mobile-web-app-status-bar-style"
   content="black-translucent"
 />
-<meta name="apple-mobile-web-app-title" content="網球派對" />
+<meta name="apple-mobile-web-app-title" content="網球大亂鬥" />
 <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
-<title>網球派對</title>
+<title>網球大亂鬥</title>
 
 <div class="wrap">
   <div class="top">
-    <h1><span class="roo">網球</span><span class="seal">派對</span></h1>
+    <h1><span class="roo">網球</span><span class="seal">大亂鬥</span></h1>
     <div class="opts">
       <div class="seg" role="group" aria-label="難度">
         <button type="button" id="lv-easy" data-lv="easy" aria-pressed="false">
@@ -57,12 +57,10 @@
   <div class="stage" id="stage">
     <div id="game"></div>
     <button type="button" id="skip" hidden>跳過 ▶▶</button>
-    <button type="button" id="pausebtn" aria-label="暫停／選單" hidden>
-      ❚❚
-    </button>
+    <button type="button" id="pausebtn" aria-label="暫停／選單">❚❚</button>
     <div class="overlay" id="overlay">
       <div class="menu-content" id="menu-content">
-        <h2 id="ov-title">網球派對</h2>
+        <h2 id="ov-title">網球大亂鬥</h2>
         <p id="ov-text"></p>
         <div class="select" id="select">
           <div class="pickcol">
@@ -74,6 +72,7 @@
               </button>
             </div>
             <div class="grid" id="grid" role="group" aria-label="角色"></div>
+            <div class="chars" id="sets" role="group" aria-label="選賽制"></div>
           </div>
           <div class="card">
             <div class="vs">
@@ -87,12 +86,22 @@
                 <figcaption></figcaption>
               </figure>
             </div>
-            <div class="attr-cards" id="attr-cards"></div>
+            <canvas
+              id="radar"
+              width="560"
+              height="440"
+              role="img"
+              aria-label="能力比較圖"
+            ></canvas>
             <div class="character-tags" id="character-tags"></div>
             <div class="cstat" id="cstat"></div>
           </div>
         </div>
-        <div class="quick">點一下＝移動，滑動＝擊球（一局搶七）</div>
+        <div class="rotate touchonly">↻ 手機橫放更好玩</div>
+        <div class="quick">
+          <span class="keys"><kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打</span
+          ><span class="touch">左邊移動，右邊「打」</span>
+        </div>
       </div>
       <div class="menu-actions" id="menu-actions">
         <button type="button" class="linkbtn" id="rules-open">完整玩法</button>
@@ -104,63 +113,66 @@
     </div>
   </div>
 
-  <div class="help">
-    滑鼠或手指都一樣：點一下＝移動，拖曳後放開＝擊球　<kbd>P</kbd> 暫停
+  <div class="tray" id="tray" aria-hidden="true">
+    <div class="tside">
+      <b id="t-n0"></b><span class="tg t0" id="t-g0"></span
+      ><i class="bar" id="t-m0">必殺</i><i class="bar st" id="t-s0">體力</i>
+    </div>
+    <div class="tmid">
+      <div class="tpts" id="t-pts"></div>
+      <div id="t-srv"></div>
+      <div class="thint" id="t-hint"></div>
+    </div>
+    <div class="tside">
+      <b id="t-n1"></b><span class="tg t1" id="t-g1"></span
+      ><i class="bar" id="t-m1">必殺</i><i class="bar st" id="t-s1">體力</i>
+    </div>
+  </div>
+
+  <div class="pad" id="pad" aria-label="觸控操作">
+    <div id="stick" aria-label="移動（按住拖曳）">
+      <div class="base" hidden></div>
+      <div class="knob" hidden></div>
+      <span class="hint">按住這半邊拖曳＝移動</span>
+    </div>
+    <div class="acts">
+      <button type="button" class="hit" data-k="hit">打</button>
+    </div>
+  </div>
+
+  <div class="help keys">
+    <kbd>←→↑↓</kbd> 移動　<kbd>空白</kbd> 打（擊球時 ←→
+    方向；扣殺點附近按＝自動飛撲扣殺）　<kbd>P</kbd> 暫停
   </div>
 </div>
 
-<div id="boot-status" role="status">正在載入網球派對…</div>
+<div id="boot-status" role="status">正在載入網球大亂鬥…</div>
 
 <dialog id="rules-dialog" class="rules-dialog" aria-labelledby="rules-title">
   <h2 id="rules-title" tabindex="-1" autofocus>完整玩法</h2>
   <ul>
+    <li>跑到地上的<b>黃圈</b>按「打」。提早按＝<b>蓄力</b>（會多耗體力）。</li>
     <li>
-      <b>點一下</b
-      >：球飛向你時＝排好回完這球後要站的位置；球飛向對手時＝立刻走過去；發球前＝左右移動發球站位。
+      擊球時按住
+      <b>←→</b> 控制方向；高吊球、小球會隨機出現；邊跑邊打球會拐彎。
     </li>
     <li>
-      <b>拖曳再放開</b
-      >＝擊球：往哪個方向拖就打向哪邊，拖越長打越深（太長會出界，落點變紅），滑越快球越快越平、滑越慢越是高吊球。
-    </li>
-    <li>
-      球飛向你時角色會<b>自動左右追球</b>，球快到時畫面變<b>慢動作</b>：先拖著，<b>放開＝立刻揮拍</b>。球在拍子範圍內才打得到，太早放開＝揮空。拖回起點再放開＝取消。
-    </li>
-    <li>
-      打到球那一刻的<b>高度</b>決定球種：低＝削球（倒旋、落地不太彈），腰＝上旋抽球，高＝高點強攻；落地前打＝截擊（快滑平擊、慢滑切球）、高的＝凌空抽球。
-    </li>
-    <li>
-      <b>球在發光</b
-      >時放開＝<b>完美擊球</b>（腰高、靠近身體），球更快、演出更大。
-    </li>
-    <li>
-      高球放開會起跳<b>扣殺</b>（發金光時放開＝完美扣殺）；差一點點接不到時放開＝<b>飛撲</b>。
-    </li>
-    <li>
-      揮拍有<b>誤差</b>：落點範圍是一個沿著球路拉長的<b>橢圓</b>，球落在橢圓內；平快球可能<b>掛網</b>、深的快球可能出界（橢圓下方會寫「掛網
-      x%／出界
-      x%」）。白＝保證進，橘＝有風險，紅＝瞄的點就出界。滑越快、準度越低（或這拍有「噴」的詞條），橢圓越大；慢慢挑高最安全。滑動畫成弧線＝<b>側旋</b>，球會先往外拐再拐回來。
-    </li>
-    <li>
-      球在身體右邊＝<b>正拍</b>，左邊＝<b>反拍</b>，落地前＝<b>截擊</b>；每隻角色有四條數值（準度、旋轉、敏捷、體力）和最多
-      5 個<b>詞條</b>（白＝強項、紅＝弱點，例如正拍重砲 III、反拍軟
-      II）。自動追球會盡量繞到你比較強的那一側。
+      高球會出現紅色<b>扣殺點</b>：附近按「打」會自動飛撲<b>扣殺</b>（按鈕變「扣殺!」）；按鈕發亮、出現「扣殺！」時按＝<b>完美扣殺</b>。
     </li>
     <li>
       <b>發球</b
-      >也是拖曳放開，可以瞄發球區任何位置（包括靠網的角落）；圈超出對角發球區、或滑太快打短角掛網＝<b>發球失誤</b>，連兩次＝雙發失誤丟分。
+      >：按一次拋球、最高點再按＝完美發球（上旋、切球隨機出現）。左右區每分輪流。
     </li>
+    <li>集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。</li>
     <li>
-      必殺條滿了，打出角色自己的<b>發動條件</b>（選角畫面有寫，例如袋鼠扣殺、企鵝飛撲）就會放<b>必殺</b>，預判變金色；條件不符就是普通球、條保留。發球不能放必殺。每隻角色還有自己的<b>特技</b>。
+      連續 3
+      次<b>完美擊球</b>＝<b>無我境界</b>：完美區變大、集氣加倍，丟分才解除。
     </li>
+    <li>對拍越長球越快；贏下 10 拍以上的長對拍＝<b>必殺直接集滿</b>。</li>
     <li>
-      <b>球網會壞</b
-      >：球撞網會讓那一段掉血，打破後整場都破著，球直接穿過；發球打破網還落在發球區＝破網發球。
+      對方必殺飛來時<b>提早按「打」蓄力</b>或打出<b>完美擊球</b>＝<b>退貨</b>，原路打回去（可以一直互懟，越來越快）。
     </li>
-    <li>對方必殺飛來時打出<b>完美擊球</b>＝<b>退貨</b>，原路打回去。</li>
-    <li>
-      一場＝<b>一局搶七</b>：先拿 7 分且領先 2 分就贏；第 1 分後每 2
-      分換人發球。
-    </li>
+    <li><b>體力</b>越少跑越慢，站著會回。P 暫停。</li>
   </ul>
   <form method="dialog"><button class="btn">關閉</button></form>
 </dialog>
