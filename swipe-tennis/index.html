@@ -1,0 +1,147 @@
+<!doctype html>
+<link rel="preload" as="image" href="./assets/heads-hulk0.webp">
+<link rel="preload" as="image" href="./assets/heads-hulk1.webp">
+<link rel="preload" as="image" href="./assets/heads-cap0.webp">
+<link rel="preload" as="image" href="./assets/heads-cap1.webp">
+<link rel="preload" as="image" href="./assets/heads-fox0.webp">
+<link rel="preload" as="image" href="./assets/heads-fox1.webp">
+<link rel="preload" as="image" href="./assets/heads-capy0.webp">
+<link rel="preload" as="image" href="./assets/heads-capy1.webp">
+
+<script type="module" crossorigin src="./assets/index-QrLTQnYv.js"></script>
+<link rel="stylesheet" crossorigin href="./assets/index-BK2v2Io9.css">
+
+<meta charset="utf-8" />
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1, viewport-fit=cover"
+/>
+<!-- iOS/iPadOS: launched from "加入主畫面" the page runs full-screen without the Fullscreen API (see startMatch) -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta
+  name="apple-mobile-web-app-status-bar-style"
+  content="black-translucent"
+/>
+<meta name="apple-mobile-web-app-title" content="網球派對" />
+<link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
+<title>網球派對</title>
+
+<div class="wrap">
+  <div class="top">
+    <h1><span class="roo">網球</span><span class="seal">派對</span></h1>
+    <div class="opts">
+      <div class="seg" role="group" aria-label="難度">
+        <button type="button" id="lv-easy" data-lv="easy" aria-pressed="false">
+          簡單
+        </button>
+        <button
+          type="button"
+          id="lv-normal"
+          data-lv="normal"
+          aria-pressed="true"
+        >
+          普通
+        </button>
+        <button type="button" id="lv-hard" data-lv="hard" aria-pressed="false">
+          困難
+        </button>
+      </div>
+      <button type="button" class="btn" id="sound" aria-pressed="true">
+        音效：開
+      </button>
+      <button type="button" class="btn" id="restart">重選角色</button>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div id="game"></div>
+    <button type="button" id="skip" hidden>跳過 ▶▶</button>
+    <button type="button" id="pausebtn" aria-label="暫停／選單" hidden>
+      ❚❚
+    </button>
+    <div class="overlay" id="overlay">
+      <div class="menu-content" id="menu-content">
+        <h2 id="ov-title">網球派對</h2>
+        <p id="ov-text"></p>
+        <div class="select" id="select">
+          <div class="pickcol">
+            <div class="who" role="group" aria-label="要選誰">
+              <button type="button" data-who="me" aria-pressed="true">
+                選自己</button
+              ><button type="button" data-who="opp" aria-pressed="false">
+                選對手
+              </button>
+            </div>
+            <div class="grid" id="grid" role="group" aria-label="角色"></div>
+          </div>
+          <div class="card">
+            <div class="vs">
+              <figure id="vs-me">
+                <canvas width="168" height="168"></canvas>
+                <figcaption></figcaption>
+              </figure>
+              <span class="vstag">VS</span>
+              <figure id="vs-opp">
+                <canvas width="168" height="168"></canvas>
+                <figcaption></figcaption>
+              </figure>
+            </div>
+            <canvas
+              id="radar"
+              width="560"
+              height="440"
+              role="img"
+              aria-label="能力比較圖"
+            ></canvas>
+            <div class="character-tags" id="character-tags"></div>
+            <div class="cstat" id="cstat"></div>
+          </div>
+        </div>
+        <div class="quick">點一下＝移動，滑動＝擊球（一局搶七）</div>
+      </div>
+      <div class="menu-actions" id="menu-actions">
+        <button type="button" class="linkbtn" id="rules-open">完整玩法</button>
+        <button type="button" class="linkbtn" id="replay">
+          ▶ 重看開場動畫
+        </button>
+        <button type="button" class="play" id="ov-btn">開始比賽</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="help">
+    滑鼠或手指都一樣：點一下＝移動，拖曳後放開＝擊球　<kbd>P</kbd> 暫停
+  </div>
+</div>
+
+<div id="boot-status" role="status">正在載入網球派對…</div>
+
+<dialog id="rules-dialog" class="rules-dialog" aria-labelledby="rules-title">
+  <h2 id="rules-title" tabindex="-1" autofocus>完整玩法</h2>
+  <ul>
+    <li>
+      <b>點一下</b
+      >：球飛向你時＝排好下一拍要站的位置；球飛向對手時＝立刻走過去；發球前＝左右移動發球站位。
+    </li>
+    <li>
+      <b>拖曳再放開</b
+      >＝擊球：往哪個方向拖就打向哪邊，拖越長打越深（太長會出界，落點變紅），滑越快球越快越平、滑越慢越是高吊球。
+    </li>
+    <li>
+      球飛向你時角色會<b>自動追球</b>；提早放開＝預約這一拍，球一進到拍子範圍就自動打。拖回起點再放開＝取消。
+    </li>
+    <li>
+      等球飛進腳下的<b>藍圈（完美區）</b>才放開＝<b>完美擊球</b>，球更快、演出更大。
+    </li>
+    <li>高球會自動起跳<b>扣殺</b>；差一點點接不到會自動<b>飛撲</b>。</li>
+    <li><b>發球</b>也是拖曳放開，落點一定在對角發球區內，不會失誤。</li>
+    <li>集氣滿了，下一球自動<b>必殺</b>；每隻角色還有自己的<b>特技</b>。</li>
+    <li>對方必殺飛來時打出<b>完美擊球</b>＝<b>退貨</b>，原路打回去。</li>
+    <li>
+      一場＝<b>一局搶七</b>：先拿 7 分且領先 2 分就贏；第 1 分後每 2
+      分換人發球。
+    </li>
+  </ul>
+  <form method="dialog"><button class="btn">關閉</button></form>
+</dialog>
