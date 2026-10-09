@@ -1,10 +1,3 @@
 # mini-games
 
-網頁小遊戲，瀏覽器開啟線上網址即可玩。
-
-- [網球派對](https://yu-anqq.github.io/mini-games/roo-tennis/)
-
-## 封存版本
-
-- [網球大亂鬥（封存橫式版）](https://yu-anqq.github.io/mini-games/roo-tennis-landscape/)
-- [網球大亂鬥（封存 Canvas 版）](https://yu-anqq.github.io/mini-games/roo-tennis-classic/)
+已停止維護。網球派對搬到 https://tennis.yuanhuang.dev/ ，本站所有路徑都轉址過去。
